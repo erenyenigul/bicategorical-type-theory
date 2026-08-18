@@ -1,10 +1,15 @@
 
+type 'a morphism =
+  | Id of 'a
+  | Var of string
+  | Compose of 'a morphism * 'a morphism
+
 type context = string
-type substitution = string
+type substitution = context morphism
 type substitution_reduction = string
 type term_reduction = string
 type type_ = string
-type term = string (* for now. idk what data structure term must be *)
+type term = type_ morphism
 
 type judgement =
   (* (1) Γ ctx - Γ is a context *)
