@@ -1,0 +1,4 @@
+(executable
+ (public_name bicategorical-tt)
+ (name main)
+ (libraries bicategorical_tt))
