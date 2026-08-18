@@ -62,7 +62,7 @@ let rec check_judgement : judgement -> bool = function
   | SubstitutionReductionEquality (rho, rho') when rho = rho' ->
       check_substitution_reduction rho
   | Substitution (Compose (s, t)) -> 
-    domain s = codomain t &&
+    codomain s = domain t &&
     check_substitution s && 
     check_substitution t
 
