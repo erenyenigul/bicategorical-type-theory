@@ -1,14 +1,23 @@
 
+(** Generic morphisms.
+    Composition works in diagrammatic order, i.e. given f : A → B and g : B → C, Compose(f, g) : A → C
+*)
 type 'a morphism =
   | Id of 'a
   | Var of string
   | Compose of 'a morphism * 'a morphism
 
-type context = string
+(** Types (0-cells in the displayed bicategory) are for now
+    represented as atoms (strings), not structured types *)
+type type_ = string
+
+type context =
+  | Empty
+  | Extend of context * type_
+
 type substitution = context morphism
 type substitution_reduction = string
 type term_reduction = string
-type type_ = string
 type term = type_ morphism
 
 type judgement =
@@ -42,5 +51,15 @@ type judgement =
   (* (4) Γ | S ⊢˜ t : T - term as adjoint equivalence *)
   | TermAdjointEquivalence of context * type_ * term_reduction * type_
 
+
+(** Checks if a judgement is valid.
+  *)
+let rec check_judgement : judgement -> bool = function
+  | Context ctx -> true
+  
+  | Substitution (delta, s, gamma) when delta = gamma ->
+    check_judgement (Context delta)
+      
+  | any -> failwith "Not implemented yet"
 
 let () = print_endline "Hello, World!"
