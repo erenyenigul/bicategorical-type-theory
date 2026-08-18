@@ -5,6 +5,16 @@ type 'a morphism =
   | Var of string * 'a * 'a
   | Compose of 'a morphism * 'a morphism
 
+let rec domain : 'a morphism -> 'a = function
+  | Id a -> a
+  | Var (_, a, _) -> a
+  | Compose (f, _) -> domain f
+
+let rec codomain : 'a morphism -> 'a = function
+  | Id a -> a
+  | Var (_, _, b) -> b
+  | Compose (_, g) -> codomain g
+
 type type_ = string
 (** Types (0-cells in the displayed bicategory) are for now represented as atoms
     (strings), not structured types *)
@@ -51,6 +61,11 @@ let rec check_judgement : judgement -> bool = function
   | SubstitutionReduction (Id s) -> check_substitution s
   | SubstitutionReductionEquality (rho, rho') when rho = rho' ->
       check_substitution_reduction rho
+  | Substitution (Compose (s, t)) -> 
+    domain s = codomain t &&
+    check_substitution s && 
+    check_substitution t
+
   | any -> failwith "Not implemented yet"
 
 and check_context : context -> bool = function
