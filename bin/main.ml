@@ -42,9 +42,8 @@ let rec check_judgement : judgement -> bool = function
   | Context ctx -> true
   | Substitution s -> check_substitution s
   | SubstitutionReduction (Id s) -> check_substitution s
-  | SubstitutionReductionEquality (rho, rho') when rho = rho' ->
-      check_substitution_reduction rho
-  
+  | SubstitutionReductionEquality (rho, rho') -> check_substitution_reduction_equality rho rho'
+
   | any -> failwith "Not implemented yet"
 
 and check_context : context -> bool = function
@@ -56,16 +55,16 @@ and check_substitution : substitution -> bool = function
   | Var (x, delta, gamma) ->
       check_context delta && check_context gamma
   | Compose (s1, s2) ->
-      One_cell.codomain s1 = One_cell.domain s2 &&
+      One_cell.composable s1 s2 &&
       check_substitution s1 && check_substitution s2
 
 and check_substitution_reduction : substitution_reduction -> bool = function
   | Id s -> check_substitution s
   | Var (rho, s, s') ->
-      One_cell.domain s = One_cell.domain s' && One_cell.codomain s = One_cell.codomain s' &&
+      One_cell.parallel s s' &&
       check_substitution s && check_substitution s'
   | Compose (rho1, rho2) ->
-      Two_cell.codomain rho1 = Two_cell.domain rho2 &&
+      Two_cell.composable rho1 rho2 &&
       check_substitution_reduction rho1 && check_substitution_reduction rho2
   | LeftWhisker (s, rho) ->
       let t = Two_cell.domain rho in
@@ -75,6 +74,44 @@ and check_substitution_reduction : substitution_reduction -> bool = function
   | RightWhisker (rho, t) ->
       let s = Two_cell.domain rho in
       check_substitution_reduction rho &&
-      One_cell.codomain s = One_cell.domain t &&
+      One_cell.composable s t &&
       check_substitution t 
+
+  and check_substitution_reduction_equality (rho : substitution_reduction) (rho': substitution_reduction) : bool =
+    match rho, rho' with
+    | r1, r2 when r1 = r2 ->    
+      check_substitution_reduction r1
+    | RightWhisker (Id s, t), Id (Compose (s', t'))
+    | Id (Compose (s', t')), RightWhisker (Id s, t)  when s = s' && t = t' ->
+      check_substitution s && check_substitution t
+    | LeftWhisker (s, Id t), Id (Compose (s', t'))
+    | Id (Compose (s', t')), LeftWhisker (s, Id t) when s = s' && t = t' ->
+      check_substitution s && check_substitution t
+    | Compose (LeftWhisker (s, rho), LeftWhisker (s', rho')), LeftWhisker (s'', Compose (rho'', rho'''))
+    | LeftWhisker (s'', Compose (rho'', rho''')), Compose (LeftWhisker (s, rho), LeftWhisker (s', rho'))
+      when s = s' && s' = s'' && rho = rho'' && rho' = rho''' -> 
+        let t  = Two_cell.domain rho  in
+        let t' = Two_cell.domain rho' in
+        
+        check_substitution_reduction rho  &&
+        check_substitution_reduction rho' &&
+        Two_cell.composable rho rho' &&
+        One_cell.parallel t t' &&
+        One_cell.composable s t
+    
+    | Compose (RightWhisker (sigma, t), RightWhisker (sigma', t')), RightWhisker (Compose (sigma'', sigma'''), t'') 
+    | RightWhisker (Compose (sigma'', sigma'''), t''), Compose (RightWhisker (sigma, t), RightWhisker (sigma', t')) 
+      when t = t' && t' = t'' && sigma = sigma'' && sigma' = sigma''' ->
+        let s  = Two_cell.domain sigma  in 
+        let s' = Two_cell.domain sigma' in
+        
+        check_substitution_reduction sigma &&
+        check_substitution_reduction sigma' &&
+        Two_cell.composable sigma sigma' &&
+        One_cell.parallel s s' &&
+        One_cell.composable s t
+
+    | _ -> false
+
+
 let () = print_endline "Hello, World!"
