@@ -12,3 +12,6 @@ let rec codomain : 'a t -> 'a = function
 | Id a -> a
 | Var (_, _, b) -> b
 | Compose (_, g) -> codomain g
+
+let parallel (f: 'a t) (g: 'a t) : bool = domain f = domain g && codomain f = codomain g
+let composable (f: 'a t) (g: 'a t) : bool = codomain f = domain g

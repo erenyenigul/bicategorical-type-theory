@@ -21,3 +21,5 @@ let rec codomain : 'a t -> 'a One_cell.t = function
 | Compose (_, g) -> codomain g
 | LeftWhisker (e, f) -> One_cell.Compose (e, codomain f)
 | RightWhisker (f, e) -> One_cell.Compose (codomain f, e)
+
+let composable (f: 'a t) (g: 'a t) : bool = codomain f = domain g
