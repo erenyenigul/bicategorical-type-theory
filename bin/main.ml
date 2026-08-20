@@ -85,6 +85,21 @@ and check_substitution_reduction : substitution_reduction -> bool = function
       One_cell.composable s t &&
       check_substitution t 
 
+  | LeftUnitor s
+  | LeftUnitorInverse s
+  | RightUnitor s 
+  | RightUnitorInverse s ->
+    check_substitution s
+  
+  | Associator        (r, s, t)
+  | AssociatorInverse (r, s, t) ->
+    check_substitution t &&
+    check_substitution s &&
+    check_substitution r &&
+    One_cell.composable r s &&
+    One_cell.composable s t
+  
+
   and check_substitution_reduction_equality (rho : substitution_reduction) (rho': substitution_reduction) : bool =
     match rho, rho' with
     | r1, r2 when r1 = r2 ->    
@@ -147,30 +162,33 @@ and check_substitution_reduction : substitution_reduction -> bool = function
       check_substitution_reduction sigma &&
       One_cell.composable s t (* implicitly checks s' t' are also composable as they are parallel *)
 
+    (* In this next case, associative variants are missing. Also, I am not super sure about the implementation. 
+    *)
+    | Compose (Compose (RightUnitorInverse s_1, RightWhisker (rho_1, Id gamma_1)), RightUnitor s'_1), rho_2
+    | rho_2, Compose (Compose (RightUnitorInverse s_1, RightWhisker (rho_1, Id gamma_1)), RightUnitor s'_1)
+      when rho_1 = rho_2 ->
+
+      let (rho, s, s', gamma) = rho_1, s_1, s'_1, gamma_1 in
+      
+      check_substitution_reduction rho &&
+      check_substitution s &&
+      check_substitution s' &&
+      One_cell.parallel s s'
+
     | _ -> false
 
   and check_substitution_isomorphism : substitution_reduction -> bool = function
-    | Var (l_s_1, Compose (Id delta_1, s_1), s_2) when s_1 = s_2 ->
-      let l_s, s, delta = l_s_1, s_1, delta_1 in
-
-      check_substitution s &&
-      delta = One_cell.domain s
-
-    | Var (r_s_1, Compose (s_1, Id gamma_1), s_2) when s_1 = s_2 ->
-      let r_s, s, gamma = r_s_1, s_1, gamma_1 in
-
-      check_substitution s &&
-      One_cell.codomain s = gamma
-
-    | Var (alpha_rst_1, Compose (r_1, Compose (s_1, t_1)), Compose (Compose (r_2, s_2), t_2)) when r_1 = r_2 && s_1 = s_2 && t_1 = t_2 ->
+    | LeftUnitor s
+    | RightUnitor s -> check_substitution s
+    
+    | Associator (r, s, t) ->
+        check_substitution t &&
+        check_substitution s &&
+        check_substitution r &&
+        One_cell.composable r s &&
+        One_cell.composable s t
       
-      let (alpha_rst, r, s, t) = alpha_rst_1, r_1, s_1, t_1 in
       
-      check_substitution t &&
-      check_substitution s &&
-      check_substitution r &&
-      One_cell.composable r s &&
-      One_cell.composable s t
 
     | Id s -> failwith "Not implemented yet"
 
@@ -179,5 +197,6 @@ and check_substitution_reduction : substitution_reduction -> bool = function
     | Compose (rho1, rho2) -> failwith "Not implemented yet"
     | LeftWhisker (s, rho) -> failwith "Not implemented yet"
     | RightWhisker (rho, t) -> failwith "Not implemented yet"
+    | other -> failwith "Not implemented yet"
 
 let () = print_endline "Hello, World!"
