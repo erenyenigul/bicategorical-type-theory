@@ -5,6 +5,9 @@ type type_ = string
 type context = Empty | Extend of context * type_
 type substitution = context One_cell.t
 type substitution_reduction = context Two_cell.t
+
+
+
 type term = type_ One_cell.t
 type term_reduction = type_ Two_cell.t
 
@@ -27,9 +30,8 @@ type judgement =
   (* (8) Γ | S ⊢ ρ ≡ ρ' : t ↝ t' : T (where Γ | S ⊢ ρ, ρ' : t ↝ t' : T) - ρ is equal to ρ' *)
   | TermReductionEquality of
       context * type_ * term_reduction * term_reduction * term * term * type_
-  (* (1) Δ ⊢ ρ : s ≃ t : Γ - substitution equivalence *)
-  | SubstitutionEquivalence of
-      context * substitution_reduction * substitution * substitution * context
+  (* (1) Δ ⊢ ρ : s ≃ t : Γ - invertible reduction *)
+  | SubstitutionIsomorphism of substitution_reduction
   (* (2) Γ | S ⊢ ρ : t ≃ t' : T - term equivalence *)
   | TermEquivalence of context * type_ * term_reduction * term * term * type_
   (* (3) Δ ⊢˜ s : Γ - substitution as adjoint equivalence *)
@@ -48,6 +50,7 @@ let rec check_judgement : judgement -> bool = function
   | Substitution s -> check_substitution s
   | SubstitutionReduction (Id s) -> check_substitution s
   | SubstitutionReductionEquality (rho, rho') -> check_substitution_reduction_equality rho rho'
+  | SubstitutionIsomorphism rho -> check_substitution_isomorphism rho
 
   | any -> failwith "Not implemented yet"
 
@@ -146,5 +149,27 @@ and check_substitution_reduction : substitution_reduction -> bool = function
 
     | _ -> false
 
+  and check_substitution_isomorphism : substitution_reduction -> bool = function
+    | Var (l_s_1, Compose (Id delta_1, s_1), s_2) when s_1 = s_2 ->
+      let l_s, s, delta = l_s_1, s_1, delta_1 in
+
+      check_substitution s &&
+      delta = One_cell.domain s
+
+    | Var (r_s_1, Compose (s_1, Id gamma_1), s_2) when s_1 = s_2 ->
+      let r_s, s, gamma = r_s_1, s_1, gamma_1 in
+
+      check_substitution s &&
+      One_cell.codomain s = gamma
+
+    
+
+    | Id s -> failwith "Not implemented yet"
+
+
+
+    | Compose (rho1, rho2) -> failwith "Not implemented yet"
+    | LeftWhisker (s, rho) -> failwith "Not implemented yet"
+    | RightWhisker (rho, t) -> failwith "Not implemented yet"
 
 let () = print_endline "Hello, World!"
