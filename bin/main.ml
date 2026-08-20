@@ -162,7 +162,15 @@ and check_substitution_reduction : substitution_reduction -> bool = function
       check_substitution s &&
       One_cell.codomain s = gamma
 
-    
+    | Var (alpha_rst_1, Compose (r_1, Compose (s_1, t_1)), Compose (Compose (r_2, s_2), t_2)) when r_1 = r_2 && s_1 = s_2 && t_1 = t_2 ->
+      
+      let (alpha_rst, r, s, t) = alpha_rst_1, r_1, s_1, t_1 in
+      
+      check_substitution t &&
+      check_substitution s &&
+      check_substitution r &&
+      One_cell.composable r s &&
+      One_cell.composable s t
 
     | Id s -> failwith "Not implemented yet"
 
