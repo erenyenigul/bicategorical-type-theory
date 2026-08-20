@@ -129,6 +129,21 @@ and check_substitution_reduction : substitution_reduction -> bool = function
         One_cell.parallel s s' &&
         One_cell.composable s t
 
+    | Compose (RightWhisker (sigma_1, t_1), LeftWhisker (s'_1, rho_1)), Compose (LeftWhisker (s_1, rho_2), RightWhisker (sigma_2, t'_1)) 
+    | Compose (LeftWhisker (s_1, rho_2), RightWhisker (sigma_2, t'_1)), Compose (RightWhisker (sigma_1, t_1), LeftWhisker (s'_1, rho_1))
+      when sigma_1 = sigma_2 && rho_1 = rho_2 ->
+      
+      let (sigma, rho, t, t', s, s') = sigma_1, rho_1, t_1, t'_1, s_1, s'_1 in
+
+      t  = (Two_cell.domain rho) &&
+      t' = (Two_cell.codomain rho) &&
+      s  = (Two_cell.domain sigma) &&
+      s' = (Two_cell.codomain sigma) &&
+
+      check_substitution_reduction rho &&
+      check_substitution_reduction sigma &&
+      Two_cell.composable sigma rho
+
     | _ -> false
 
 
