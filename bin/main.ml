@@ -142,7 +142,7 @@ and check_substitution_reduction : substitution_reduction -> bool = function
 
       check_substitution_reduction rho &&
       check_substitution_reduction sigma &&
-      Two_cell.composable sigma rho
+      One_cell.composable s t (* implicitly checks s' t' are also composable as they are parallel *)
 
     | _ -> false
 
