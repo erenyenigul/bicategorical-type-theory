@@ -37,6 +37,11 @@ type judgement =
   (* (4) Γ | S ⊢˜ t : T - term as adjoint equivalence *)
   | TermAdjointEquivalence of context * type_ * term_reduction * type_
 
+(** Checks if all the given terms of a list are equal to each other *)
+let all_equal = function
+  | [] -> true
+  | x :: xs -> List.for_all ((=) x) xs
+
 (** Checks if a judgement is valid. *)
 let rec check_judgement : judgement -> bool = function
   | Context ctx -> true
@@ -81,15 +86,25 @@ and check_substitution_reduction : substitution_reduction -> bool = function
     match rho, rho' with
     | r1, r2 when r1 = r2 ->    
       check_substitution_reduction r1
-    | RightWhisker (Id s, t), Id (Compose (s', t'))
-    | Id (Compose (s', t')), RightWhisker (Id s, t)  when s = s' && t = t' ->
+    
+    | RightWhisker (Id s_1, t_1), Id (Compose (s_2, t_2))
+    | Id (Compose (s_1, t_1)), RightWhisker (Id s_2, t_2)  when s_1 = s_2 && t_1 = t_2 ->
+
+      let (s, t) = s_1, t_1 in
       check_substitution s && check_substitution t
-    | LeftWhisker (s, Id t), Id (Compose (s', t'))
-    | Id (Compose (s', t')), LeftWhisker (s, Id t) when s = s' && t = t' ->
+    
+    | LeftWhisker (s_1, Id t_1), Id (Compose (s_2, t_2))
+    | Id (Compose (s_2, t_2)), LeftWhisker (s_1, Id t_1) when s_1 = s_2 && t_1 = t_2 ->
+      
+      let (s, t) = s_1, t_1 in
       check_substitution s && check_substitution t
-    | Compose (LeftWhisker (s, rho), LeftWhisker (s', rho')), LeftWhisker (s'', Compose (rho'', rho'''))
-    | LeftWhisker (s'', Compose (rho'', rho''')), Compose (LeftWhisker (s, rho), LeftWhisker (s', rho'))
-      when s = s' && s' = s'' && rho = rho'' && rho' = rho''' -> 
+    
+    | Compose (LeftWhisker (s_1, rho_1), LeftWhisker (s_2, rho'_1)), LeftWhisker (s_3, Compose (rho_2, rho'_2))
+    | LeftWhisker (s_3, Compose (rho_2, rho'_2)), Compose (LeftWhisker (s_1, rho_1), LeftWhisker (s_2, rho'_1))
+      when all_equal [s_1; s_2; s_3] && rho_1 = rho_2 && rho'_1 = rho'_2 -> 
+        
+        let (rho, rho', s) = rho_1, rho'_1, s_1 in
+
         let t  = Two_cell.domain rho  in
         let t' = Two_cell.domain rho' in
         
@@ -99,9 +114,12 @@ and check_substitution_reduction : substitution_reduction -> bool = function
         One_cell.parallel t t' &&
         One_cell.composable s t
     
-    | Compose (RightWhisker (sigma, t), RightWhisker (sigma', t')), RightWhisker (Compose (sigma'', sigma'''), t'') 
-    | RightWhisker (Compose (sigma'', sigma'''), t''), Compose (RightWhisker (sigma, t), RightWhisker (sigma', t')) 
-      when t = t' && t' = t'' && sigma = sigma'' && sigma' = sigma''' ->
+    | Compose (RightWhisker (sigma_1, t_1), RightWhisker (sigma'_1, t_2)), RightWhisker (Compose (sigma_2, sigma'_2), t_3) 
+    | RightWhisker (Compose (sigma_2, sigma'_2), t_3), Compose (RightWhisker (sigma_1, t_1), RightWhisker (sigma'_1, t_2))
+      when all_equal [t_1; t_2; t_3] && sigma_1 = sigma_2 && sigma'_1 = sigma'_2 ->
+        
+        let (sigma, sigma', t) = sigma_1, sigma'_1, t_1 in
+
         let s  = Two_cell.domain sigma  in 
         let s' = Two_cell.domain sigma' in
         
