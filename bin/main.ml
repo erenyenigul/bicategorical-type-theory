@@ -162,10 +162,9 @@ and check_substitution_reduction : substitution_reduction -> bool = function
       check_substitution_reduction sigma &&
       One_cell.composable s t (* implicitly checks s' t' are also composable as they are parallel *)
 
-    (* In this next case, associative variants are missing. Also, I am not super sure about the implementation. 
+    (* In this next case, associative and symmetric variants are missing. Also, I am not super sure about the implementation. 
     *)
     | Compose (Compose (RightUnitorInverse s_1, RightWhisker (rho_1, Id gamma_1)), RightUnitor s'_1), rho_2
-    | rho_2, Compose (Compose (RightUnitorInverse s_1, RightWhisker (rho_1, Id gamma_1)), RightUnitor s'_1)
       when rho_1 = rho_2 ->
 
       let (rho, s, s', gamma) = rho_1, s_1, s'_1, gamma_1 in
