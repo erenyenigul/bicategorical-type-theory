@@ -87,21 +87,6 @@ and check_substitution_reduction : substitution_reduction -> bool = function
       One_cell.composable s t &&
       check_substitution t 
 
-  | LeftUnitor s
-  | LeftUnitorInverse s
-  | RightUnitor s 
-  | RightUnitorInverse s ->
-    check_substitution s
-  
-  | Associator        (r, s, t)
-  | AssociatorInverse (r, s, t) ->
-    check_substitution t &&
-    check_substitution s &&
-    check_substitution r &&
-    One_cell.composable r s &&
-    One_cell.composable s t
-  
-
   and check_substitution_reduction_equality (rho : substitution_reduction) (rho': substitution_reduction) : bool =
     match rho, rho' with
     | r1, r2 when r1 = r2 ->    
@@ -166,38 +151,24 @@ and check_substitution_reduction : substitution_reduction -> bool = function
 
     (* In this next case, associative and symmetric variants are missing. Also, I am not super sure about the implementation. 
     *)
-    | Compose (Compose (RightUnitorInverse s_1, RightWhisker (rho_1, Id gamma_1)), RightUnitor s'_1), rho_2
-      when rho_1 = rho_2 ->
-
-      let (rho, s, s', gamma) = rho_1, s_1, s'_1, gamma_1 in
-      
-      check_substitution_reduction rho &&
-      check_substitution s &&
-      check_substitution s' &&
-      One_cell.parallel s s'
-
+    
     | _ -> false
 
   and check_substitution_isomorphism : substitution_reduction -> bool = function
-    | LeftUnitor s
-    | RightUnitor s -> check_substitution s
-    
-    | Associator (r, s, t) ->
-        check_substitution t &&
-        check_substitution s &&
-        check_substitution r &&
-        One_cell.composable r s &&
-        One_cell.composable s t
-      
-      
-
     | Id s -> failwith "Not implemented yet"
-
-
-
     | Compose (rho1, rho2) -> failwith "Not implemented yet"
     | LeftWhisker (s, rho) -> failwith "Not implemented yet"
     | RightWhisker (rho, t) -> failwith "Not implemented yet"
     | other -> failwith "Not implemented yet"
 
-let () = print_endline "Hello, World!"
+
+(* example checks *)
+let _ =
+  let gamma = Extend (Empty, {ctx=Empty; name="A"}) in
+  let delta = Extend (gamma, {ctx=gamma; name="B"}) in
+  let s = One_cell.id delta in
+  let t = One_cell.id delta in
+  let rho = Two_cell.var "rho" s t in
+  let phi = Two_cell.var "phi" s t in
+  let judgement = SubstitutionReductionEquality (rho, phi) in
+  assert (check_judgement judgement)

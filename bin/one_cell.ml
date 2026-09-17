@@ -15,3 +15,11 @@ let rec codomain : 'a t -> 'a = function
 
 let parallel (f: 'a t) (g: 'a t) : bool = domain f = domain g && codomain f = codomain g
 let composable (f: 'a t) (g: 'a t) : bool = codomain f = domain g
+
+let id (a: 'a) : 'a t = Id a
+let var (s: string) (a: 'a) (b: 'a) : 'a t = 
+  Var (s, a, b)
+
+let compose (f: 'a t) (g: 'a t) : 'a t = 
+  if composable f g then Compose (f, g)
+  else failwith "compose: not composable"
