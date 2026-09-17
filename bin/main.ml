@@ -1,12 +1,14 @@
 (** Types (0-cells in the displayed bicategory) are for now represented as atoms
     (strings), not structured types *)
-type type_ = string
 
 type context = Empty | Extend of context * type_
+and  type_ = {
+  ctx  : context;
+  name : string;
+}
+
 type substitution = context One_cell.t
 type substitution_reduction = context Two_cell.t
-
-
 
 type term = type_ One_cell.t
 type term_reduction = type_ Two_cell.t
