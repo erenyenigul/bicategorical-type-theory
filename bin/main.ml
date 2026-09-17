@@ -1,8 +1,8 @@
 (** Types (0-cells in the displayed bicategory) are for now represented as atoms
     (strings), not structured types *)
 
-type context = Empty | Extend of context * type_
-and  type_ = {
+type context = Empty | Extend of context * ty
+and  ty = {
   ctx  : context;
   name : string;
 }
@@ -10,8 +10,8 @@ and  type_ = {
 type substitution = context One_cell.t
 type substitution_reduction = context Two_cell.t
 
-type term = type_ One_cell.t
-type term_reduction = type_ Two_cell.t
+type term = ty One_cell.t
+type term_reduction = ty Two_cell.t
 
 type judgement =
   (* (1) Γ ctx - Γ is a context *)
@@ -23,23 +23,23 @@ type judgement =
   (* (4) Δ ⊢ r ≡ r' : s ↝ t : Γ (where Δ ⊢ r, r' : s ↝ t : Γ) - r is equal to r' *)
   | SubstitutionReductionEquality of substitution_reduction * substitution_reduction
   (* (5) Γ ⊢ T type (where Γ ctx) - T is a type in context Γ *)
-  | Type of context * type_
+  | Type of context * ty
   (* (6) Γ | S ⊢ t : T (where Γ ⊢ S, T type) - t is a term in T depending on S in context Γ *)
   (* not sure about the name here *)
-  | Term of context * type_ * term * type_
+  | Term of context * ty * term * ty
   (* (7) Γ | S ⊢ ρ : t ↝ t' : T (where Γ | S ⊢ t, t' : T) - ρ is a reduction from t to t' *)
-  | TermReduction of context * type_ * term_reduction * term * term * type_
+  | TermReduction of context * ty * term_reduction * term * term * ty
   (* (8) Γ | S ⊢ ρ ≡ ρ' : t ↝ t' : T (where Γ | S ⊢ ρ, ρ' : t ↝ t' : T) - ρ is equal to ρ' *)
   | TermReductionEquality of
-      context * type_ * term_reduction * term_reduction * term * term * type_
+      context * ty * term_reduction * term_reduction * term * term * ty
   (* (1) Δ ⊢ ρ : s ≃ t : Γ - invertible reduction *)
   | SubstitutionIsomorphism of substitution_reduction
   (* (2) Γ | S ⊢ ρ : t ≃ t' : T - term equivalence *)
-  | TermEquivalence of context * type_ * term_reduction * term * term * type_
+  | TermEquivalence of context * ty * term_reduction * term * term * ty
   (* (3) Δ ⊢˜ s : Γ - substitution as adjoint equivalence *)
   | SubstitutionAdjointEquivalence of context * substitution_reduction * context
   (* (4) Γ | S ⊢˜ t : T - term as adjoint equivalence *)
-  | TermAdjointEquivalence of context * type_ * term_reduction * type_
+  | TermAdjointEquivalence of context * ty * term_reduction * ty
 
 (** Checks if all the given terms of a list are equal to each other *)
 let all_equal = function
