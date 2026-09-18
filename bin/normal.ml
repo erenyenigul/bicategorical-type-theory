@@ -130,6 +130,13 @@ and normalize_context (ctx: context) : nf_context = match ctx with
   | Nil -> []
   | Extend (t, ctx') -> (normalize_ty t) :: normalize_context ctx'
 
+and compose_nf_substitution (nf_sub1: nf_substitution) (nf_sub2: nf_substitution) : nf_substitution = 
+   { 
+      domain = nf_sub1.domain; 
+      codomain = nf_sub2.codomain;
+      gens = nf_sub1.gens @ nf_sub2.gens
+    }
+
 and normalize_substitution (sub: substitution) : nf_substitution = match sub with
   | Id ctx -> 
     let nf_ctx = normalize_context ctx in
@@ -148,11 +155,7 @@ and normalize_substitution (sub: substitution) : nf_substitution = match sub wit
   | Compose (sub1, sub2) ->
     let nf_sub1 = normalize_substitution sub1 in
     let nf_sub2 = normalize_substitution sub2 in
-    { 
-      domain = nf_sub1.domain; 
-      codomain = nf_sub2.codomain;
-      gens = nf_sub1.gens @ nf_sub2.gens
-    }
+    compose_nf_substitution nf_sub1 nf_sub2
 
   | Empty ctx ->
     let nf_ctx = normalize_context ctx in
@@ -171,4 +174,84 @@ and normalize_substitution (sub: substitution) : nf_substitution = match sub wit
       ];
     }
 
-  
+and normalize_substitution_reduction : substitution_reduction -> nf_substitution_reduction = function
+    | Id sub -> 
+      let nf_sub = normalize_substitution sub in
+
+      {
+        domain = nf_sub;
+        codomain = nf_sub;
+        slices = [];
+      }
+
+    | Var (s, sub1, sub2) ->
+      let nf_sub1 = normalize_substitution sub1 in
+      let nf_sub2 = normalize_substitution sub2 in
+
+      {
+        domain = nf_sub1;
+        codomain = nf_sub2;
+        slices = [{
+          left_whiskers = [];
+          right_whiskers = [];
+          gen = {
+            domain = nf_sub1;
+            codomain = nf_sub2;
+            name = s;
+          }
+        }]
+      }
+
+    | Compose (red1, red2) ->
+      let nf_red1 = normalize_substitution_reduction red1 in
+      let nf_red2 = normalize_substitution_reduction red2 in
+
+      {
+        domain = nf_red1.domain;
+        codomain = nf_red1.codomain;
+        slices = nf_red1.slices @ nf_red2.slices;
+      }
+    
+    | LeftWhisker (sub, red) ->
+      let nf_red = normalize_substitution_reduction red in
+      let nf_sub = normalize_substitution sub in
+      
+      let domain = compose_nf_substitution nf_sub nf_red.domain in
+      let codomain = compose_nf_substitution nf_sub nf_red.codomain in
+      let slices = List.map (fun (slice: nf_substitution_reduction_slice) -> { 
+        left_whiskers = nf_sub.gens @ slice.left_whiskers;
+        right_whiskers = slice.right_whiskers;
+        gen = {
+          name = slice.gen.name;
+          domain = compose_nf_substitution nf_sub slice.gen.domain;
+          codomain = compose_nf_substitution nf_sub slice.gen.codomain;
+        };
+      }) nf_red.slices in
+
+      {
+        domain;
+        codomain;
+        slices;
+      }
+
+    | RightWhisker (red, sub) ->
+      let nf_red = normalize_substitution_reduction red in
+      let nf_sub = normalize_substitution sub in
+      
+      let domain = compose_nf_substitution nf_red.domain nf_sub in
+      let codomain = compose_nf_substitution nf_red.codomain nf_sub in
+      let slices = List.map (fun (slice: nf_substitution_reduction_slice) -> { 
+        left_whiskers =  slice.left_whiskers;
+        right_whiskers = slice.right_whiskers @ nf_sub.gens;
+        gen = {
+          name = slice.gen.name;
+          domain = compose_nf_substitution slice.gen.domain nf_sub;
+          codomain = compose_nf_substitution slice.gen.codomain nf_sub;
+        };
+      }) nf_red.slices in
+
+      {
+        domain;
+        codomain;
+        slices;
+      }

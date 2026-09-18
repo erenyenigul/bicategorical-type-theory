@@ -1,6 +1,7 @@
 (** Types (0-cells in the displayed bicategory) are for now represented as atoms
     (strings), not structured types *)
 open Syntax
+open Normal
 
 type judgement =
   (* (1) Γ ctx - Γ is a context *)
@@ -43,6 +44,22 @@ let all_equal = function
   | [] -> true
   | x :: xs -> List.for_all ((=) x) xs
 
-(** Checks if a judgement is valid. *)
 
-let x = Normal.normalize_context
+
+(** A Random complex substitution *)
+
+let ctx1 = Extend (BaseTy ("A", []), Nil)
+let ctx2 = Extend (BaseTy ("B", []), ctx1)
+let ctx3 = Extend (BaseTy ("C", []), ctx2)
+let sub1 : substitution = Var ("x", ctx1, ctx2)
+let sub2 : substitution = Var ("y", ctx2, ctx3)
+
+let my_substitution_reduction: substitution_reduction = 
+  let sub_red1 : substitution_reduction = Var ("rho", sub1, sub2) in
+  let sub_red2 : substitution_reduction = Var ("sigma", sub1, Compose (sub1, sub2)) in 
+  Compose (sub_red1, sub_red2)
+
+
+let nf_my_substitution = Normal.normalize_substitution_reduction my_substitution_reduction
+
+
