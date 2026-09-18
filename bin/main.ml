@@ -44,3 +44,5 @@ let all_equal = function
   | x :: xs -> List.for_all ((=) x) xs
 
 (** Checks if a judgement is valid. *)
+
+let x = Normal.normalize_context

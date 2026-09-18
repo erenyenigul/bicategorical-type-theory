@@ -7,7 +7,6 @@ and substitution =
   | Var of string * context * context
   | Compose of substitution * substitution
 
-
 and substitution_reduction =
   | Id of substitution
   | Var of string * substitution * substitution
@@ -15,14 +14,15 @@ and substitution_reduction =
   | LeftWhisker of substitution * substitution_reduction
   | RightWhisker of substitution_reduction * substitution
 
-and ty = 
-  | BaseTy of string
+and ty =
+  | BaseTy of string * term list
   | SubTy of ty * substitution
 
 and term = 
-  | Id of ty
-  | Var of string * ty * ty
+  | Id of context * ty
+  | Var of string * context * ty * ty
   | Compose of term * term
+  | SubTm of term * substitution
 
 and term_reduction = 
   | Id of term
@@ -30,6 +30,7 @@ and term_reduction =
   | Compose of term_reduction * term_reduction
   | LeftWhisker of term * term_reduction
   | RightWhisker of term_reduction * term
+  | SubRed of term_reduction * substitution
 
 module Context = struct
   type t = context
@@ -49,7 +50,7 @@ end
 module Ty = struct
   type t = ty
   
-  let base (s: string) : t = BaseTy s
+  let base (s: string) (l: term list) : t = BaseTy (s, l)
   let sub (t: t) (sub: substitution) : t = SubTy (t, sub)
 end
 
@@ -81,22 +82,31 @@ end
 
 module Term = struct
   type t = term
+
+  let rec context : t -> context = function
+  | Id (ctx, _) -> ctx
+  | Var (_, ctx, _, _) -> ctx
+  | Compose (f, _) -> context f
+  | SubTm (_, s) -> Substitution.domain s
+
   let rec domain : t -> ty = function
-  | Id a -> a
-  | Var (_, a, _) -> a
+  | Id (_, a) -> a
+  | Var (_, _, a, _) -> a
   | Compose (f, _) -> domain f
+  | SubTm (t, s) -> SubTy (domain t, s)
 
   let rec codomain : t -> ty = function
-  | Id a -> a
-  | Var (_, _, b) -> b
+  | Id (_, a) -> a
+  | Var (_, _, _, b) -> b
   | Compose (_, g) -> codomain g
+  | SubTm (t, s) -> SubTy (codomain t, s)
 
-  let parallel (f: t) (g: t) : bool = domain f = domain g && codomain f = codomain g
-  let composable (f: t) (g: t) : bool = codomain f = domain g
+  let parallel (f: t) (g: t) : bool = context f = context g && domain f = domain g && codomain f = codomain g
+  let composable (f: t) (g: t) : bool = context f = context g && codomain f = domain g
 
-  let id (a: ty) : t = Id a
-  let var (s: string) (a: ty) (b: ty) : t = 
-    Var (s, a, b)
+  let id (ctx: context) (a: ty) : t = Id (ctx, a)
+  let var (s: string) (ctx: context) (a: ty) (b: ty) : t = 
+    Var (s, ctx, a, b)
 
   let compose (f: t) (g: t) : t = 
     if composable f g then Compose (f, g)
