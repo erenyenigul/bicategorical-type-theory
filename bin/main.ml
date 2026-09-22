@@ -59,7 +59,3 @@ let my_substitution_reduction: substitution_reduction =
   let sub_red2 : substitution_reduction = Var ("sigma", sub1, Compose (sub1, sub2)) in 
   Compose (sub_red1, sub_red2)
 
-
-let nf_my_substitution = Normal.normalize_substitution_reduction my_substitution_reduction
-
-
