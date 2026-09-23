@@ -6,7 +6,7 @@
 (generate_opam_files true)
 
 (source
- (github erenyenigul/bicategorical-tt))
+ (github erenyenigul/bicategorical-type-theory))
 
 (authors "Eren Yenigul <erenyenigul@gmail.com>")
 

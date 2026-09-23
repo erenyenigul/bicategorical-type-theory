@@ -7,9 +7,9 @@ maintainer: ["Eren Yenigul <erenyenigul@gmail.com>"]
 authors: ["Eren Yenigul <erenyenigul@gmail.com>"]
 license: "LICENSE"
 tags: ["add topics" "to describe" "your" "project"]
-homepage: "https://github.com/erenyenigul/bicategorical-tt"
+homepage: "https://github.com/erenyenigul/bicategorical-type-theory"
 doc: "https://url/to/documentation"
-bug-reports: "https://github.com/erenyenigul/bicategorical-tt/issues"
+bug-reports: "https://github.com/erenyenigul/bicategorical-type-theory/issues"
 depends: [
   "dune" {>= "3.23"}
   "ocaml"
@@ -29,5 +29,5 @@ build: [
     "@doc" {with-doc}
   ]
 ]
-dev-repo: "git+https://github.com/erenyenigul/bicategorical-tt.git"
+dev-repo: "git+https://github.com/erenyenigul/bicategorical-type-theory.git"
 x-maintenance-intent: ["(latest)"]
