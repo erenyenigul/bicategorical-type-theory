@@ -1,5 +1,6 @@
 (** Types (0-cells in the displayed bicategory) are for now represented as atoms
     (strings), not structured types *)
+open Bicategorical_tt
 open Syntax
 open Normal
 

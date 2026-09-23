@@ -1,6 +1,7 @@
 (lang dune 3.23)
 
 (name bicategorical-tt)
+(version 1d48665-dirty)
 
 (generate_opam_files true)
 

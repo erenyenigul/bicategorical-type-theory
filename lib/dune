@@ -1,2 +1,3 @@
 (library
- (name bicategorical_tt))
+ (name bicategorical_tt)
+ (modules syntax normal check))
