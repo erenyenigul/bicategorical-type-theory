@@ -48,9 +48,9 @@ let all_equal = function
 
 (** A Random complex substitution *)
 
-let ctx1 = Extend (BaseTy ("A", []), Nil)
-let ctx2 = Extend (BaseTy ("B", []), ctx1)
-let ctx3 = Extend (BaseTy ("C", []), ctx2)
+let ctx1 = Extend (BaseTy ("A"), Nil)
+let ctx2 = Extend (BaseTy ("B"), ctx1)
+let ctx3 = Extend (BaseTy ("C"), ctx2)
 let sub1 : substitution = Var ("x", ctx1, ctx2)
 let sub2 : substitution = Var ("y", ctx2, ctx3)
 

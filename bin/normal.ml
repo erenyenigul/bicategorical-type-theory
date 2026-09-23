@@ -38,7 +38,7 @@ and nf_substitution_reduction = {
 
 (* algebraic variant type so that it can be extended later by type formers *)
 and nf_ty = 
-  | NfBaseTy of string * nf_term list 
+  | NfBaseTy of string
 
 and nf_term_gen = {
   name: string;
@@ -112,13 +112,13 @@ and identity_term_reduction (nf_term: nf_term) : nf_term_reduction =
   }
 
 and normalize_ty: ty -> nf_ty = function 
-  | BaseTy (s, l) -> NfBaseTy (s, List.map normalize_term l)
+  | BaseTy s -> NfBaseTy s
   | SubTy (t, sub) ->  subst_nf_ty (normalize_ty t) (normalize_substitution sub)
 
 and subst_nf_ty (s: nf_ty) (sub: nf_substitution) : nf_ty = 
   if is_id_substitution sub then s
   else match s with  
-  | NfBaseTy (name, l) -> NfBaseTy (name, List.map (fun t -> subst_nf_term t sub) l)
+  | NfBaseTy name -> NfBaseTy name (* here for historical reasons, and if we need to do smt with types under substitutions *)
 
 and subst_nf_term_gen (gen: nf_term_gen) (sub: nf_substitution) : nf_term_gen = 
   if is_id_substitution sub then gen
@@ -251,10 +251,6 @@ and normalize_substitution (sub: substitution) : nf_substitution = match sub wit
     let nf_sub1 = normalize_substitution sub1 in
     let nf_sub2 = normalize_substitution sub2 in
     compose_nf_substitution nf_sub1 nf_sub2
-
-  | Empty ctx ->
-    let nf_ctx = normalize_context ctx in
-    { domain = nf_ctx; codomain = []; gens = [] }
 
   | Weaken (ctx, ty) ->
     let nf_ctx = normalize_context ctx in

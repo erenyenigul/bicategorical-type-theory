@@ -6,7 +6,6 @@ and substitution =
   | Id of context
   | Var of string * context * context
   | Compose of substitution * substitution
-  | Empty of context                     
   | Weaken of context * ty 
 
 and substitution_reduction =
@@ -17,7 +16,7 @@ and substitution_reduction =
   | RightWhisker of substitution_reduction * substitution
 
 and ty =
-  | BaseTy of string * term list
+  | BaseTy of string
   | SubTy of ty * substitution
 
 and term = 
