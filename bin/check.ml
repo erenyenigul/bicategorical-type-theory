@@ -44,8 +44,39 @@ type type_error =
       location: string option;
     }
 
-
 exception Check_error of type_error
+
+let string_of_type_error = function
+  | ContextMismatch { location } ->
+      let loc_str = match location with
+        | Some loc -> " at " ^ loc
+        | None -> ""
+      in
+      "Context mismatch" ^ loc_str
+  | SubstitutionMismatch { location } ->
+      let loc_str = match location with
+        | Some loc -> " at " ^ loc
+        | None -> ""
+      in
+      "Substitution mismatch" ^ loc_str
+  | SubstitutionReductionMismatch { location } ->
+      let loc_str = match location with
+        | Some loc -> " at " ^ loc
+        | None -> ""
+      in
+      "Substitution reduction mismatch" ^ loc_str
+  | TermMismatch { location } ->
+      let loc_str = match location with
+        | Some loc -> " at " ^ loc
+        | None -> ""
+      in
+      "Term mismatch" ^ loc_str
+  | TermReductionMismatch { location } ->
+      let loc_str = match location with
+        | Some loc -> " at " ^ loc
+        | None -> ""
+      in
+      "Term reduction mismatch" ^ loc_str
 
 
 let rec check_context : context -> unit = function

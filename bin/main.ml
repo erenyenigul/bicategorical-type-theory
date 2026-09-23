@@ -54,7 +54,10 @@ let ctx3 = Extend (BaseTy ("C"), ctx2)
 let sub1 : substitution = Var ("x", ctx1, ctx2)
 let sub2 : substitution = Var ("y", ctx2, ctx3)
 
-let sub_red1 : substitution_reduction = Var ("rho", sub1, sub2);
+let sub_red1 : substitution_reduction =
+  (Var ("rho", (sub1 : substitution), (sub2 : substitution)) : substitution_reduction)
 
-try (Check.check_substitution_reduction sub_red1)
-with Check.CheckError _ -> print_endline "Error occurred during substitution reduction check"
+let () =
+  try Check.check_substitution_reduction sub_red1 |> ignore
+  with Check.Check_error err ->
+    print_endline ("Error occurred during substitution reduction check: " ^ Check.string_of_type_error err)
