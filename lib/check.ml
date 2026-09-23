@@ -1,5 +1,6 @@
 open Normal
 open Syntax
+open Result.Syntax
 
 type substitution_boundary = {
     domain: context;
@@ -44,7 +45,11 @@ type type_error =
       location: string option;
     }
 
-exception Check_error of type_error
+exception CheckError of type_error
+
+type checker_result =
+ | Success 
+ | Failure of type_error
 
 let string_of_type_error = function
   | ContextMismatch { location } ->
@@ -97,7 +102,7 @@ and check_ty (ctx: context) (t: ty) : unit = match t with
     ()
 
 and raise_check_error (error: type_error) : unit =
-  raise (Check_error error)
+  raise (CheckError error)
 
 and assert_ty_equality (ty1: ty) (ty2: ty) : unit =
   let nf_ty1 = normalize_ty ty1 in
@@ -134,7 +139,25 @@ and assert_term_equality (tm1: term) (tm2: term) : unit =
     raise_check_error (TermMismatch {
       location = Some "In term equality check";
     })
+
+and assert_substitution_reduction_equality (red1: substitution_reduction) (red2: substitution_reduction) : unit = 
+  let nf_red1 = normalize_substitution_reduction red1 in
+  let nf_red2 = normalize_substitution_reduction red2 in
   
+  if nf_red1 <> nf_red2 then
+    raise_check_error (SubstitutionReductionMismatch {
+      location = Some "In substitution reduction equality check"
+    })
+
+and assert_term_reduction_equality (red1: term_reduction ) (red2: term_reduction ) : unit = 
+  let nf_red1 = normalize_term_reduction red1 in
+  let nf_red2 = normalize_term_reduction red2 in
+  
+  if nf_red1 <> nf_red2 then
+    raise_check_error (TermReductionMismatch {
+      location = Some "In term reduction equality check"
+    })
+
 and check_substitution : substitution -> substitution_boundary = function
   | Id ctx -> { domain = ctx; codomain = ctx; }
   | Var (name, domain, codomain) ->
@@ -308,3 +331,56 @@ and check_term_reduction : term_reduction -> term_reduction_boundary = function
           domain = SubTy (boundary_red.parallel.domain, sub); 
           codomain = SubTy (boundary_red.parallel.codomain, sub) }
       }
+
+and check_judgement : judgement -> unit = function
+  | Context ctx -> check_context ctx
+  | Substitution sub -> check_substitution sub |> ignore
+  | SubstitutionReduction red -> check_substitution_reduction |> ignore
+  | SubstitutionReductionEquality (red1, red2) ->
+    let _ = check_substitution_reduction red1 in
+    let _ = check_substitution_reduction red2 in
+
+    assert_substitution_reduction_equality red1 red2
+  | Type (ctx, t) ->
+      check_context ctx;
+      check_ty ctx t
+
+  | Term term -> check_term term |> ignore
+  | TermReduction red -> check_term_reduction red |> ignore
+  | TermReductionEquality (red1, red2) ->
+    let _ = check_term_reduction red1 in
+    let _ = check_term_reduction red2 in
+
+    assert_term_reduction_equality red1 red2
+  
+  | SubstitutionEquality (sub1, sub2) ->
+    let _ = check_substitution sub1 in
+    let _ = check_substitution sub2 in
+
+    assert_substitution_equality sub1 sub2
+  
+  | TermEquality (term1, term2) ->
+    let _ = check_term term1 in
+    let _ = check_term term2 in
+
+    assert_term_equality term1 term2
+
+  | ContextEquality (ctx1, ctx2) ->
+    let _ = check_context ctx1 in
+    let _ = check_context ctx2 in
+
+    assert_context_equality ctx1 ctx2
+
+  | TypeEquality (ctx, t1, t2) ->
+    check_context ctx;
+    check_ty ctx t1;
+    check_ty ctx t2;
+
+    assert_ty_equality t1 t2
+
+and check (j: judgement) : checker_result =
+  try (
+    check_judgement j;
+    Success  
+  ) with
+  | CheckError err -> Failure err
