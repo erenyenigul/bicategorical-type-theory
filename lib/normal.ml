@@ -295,7 +295,7 @@ and normalize_substitution_reduction : substitution_reduction -> nf_substitution
 
       {
         domain = nf_red1.domain;
-        codomain = nf_red1.codomain;
+        codomain = nf_red2.codomain;
         slices = nf_red1.slices @ nf_red2.slices;
       }
     
@@ -369,7 +369,7 @@ and normalize_term_reduction : term_reduction -> nf_term_reduction = function
     {
       context = nf_red1.context;
       domain = nf_red1.domain;
-      codomain = nf_red1.codomain;
+      codomain = nf_red2.codomain;
       slices = nf_red1.slices @ nf_red2.slices;
     }
 

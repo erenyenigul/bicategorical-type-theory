@@ -7,6 +7,7 @@ and substitution =
   | Var of string * context * context
   | Compose of substitution * substitution
   | Weaken of context * ty 
+  (*| ExtendConTm of term *)
 
 and substitution_reduction =
   | Id of substitution
@@ -14,6 +15,7 @@ and substitution_reduction =
   | Compose of substitution_reduction * substitution_reduction
   | LeftWhisker of substitution * substitution_reduction
   | RightWhisker of substitution_reduction * substitution
+  (*| ExtendConRed of term *)
 
 and ty =
   | BaseTy of string
@@ -24,6 +26,7 @@ and term =
   | Var of string * context * ty * ty
   | Compose of term * term
   | SubTm of term * substitution
+  (*| Map of ty * substitution_reduction *)
 
 and term_reduction = 
   | Id of term

@@ -159,7 +159,9 @@ and assert_term_reduction_equality (red1: term_reduction ) (red2: term_reduction
     })
 
 and check_substitution : substitution -> substitution_boundary = function
-  | Id ctx -> { domain = ctx; codomain = ctx; }
+  | Id ctx -> 
+    check_context ctx;
+    { domain = ctx; codomain = ctx; }
   | Var (name, domain, codomain) ->
     check_context domain;
     check_context codomain;
@@ -335,7 +337,7 @@ and check_term_reduction : term_reduction -> term_reduction_boundary = function
 and check_judgement : judgement -> unit = function
   | Context ctx -> check_context ctx
   | Substitution sub -> check_substitution sub |> ignore
-  | SubstitutionReduction red -> check_substitution_reduction |> ignore
+  | SubstitutionReduction red -> check_substitution_reduction red |> ignore
   | SubstitutionReductionEquality (red1, red2) ->
     let _ = check_substitution_reduction red1 in
     let _ = check_substitution_reduction red2 in
