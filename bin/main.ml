@@ -2,9 +2,9 @@ open Bicategorical_tt
 open Syntax
 open Normal
 
-let ctx1 = Extend (BaseTy ("A"), Nil)
-let ctx2 = Extend (BaseTy ("B"), ctx1)
-let ctx3 = Extend (BaseTy ("C"), ctx2)
+let ctx1 = Extend (BaseTy ("A", Nil), Nil)
+let ctx2 = Extend (BaseTy ("B", ctx1), ctx1)
+let ctx3 = Extend (BaseTy ("C", ctx2), ctx2)
 let sub1 : substitution = Var ("x", ctx1, ctx2)
 let sub2 : substitution = Var ("y", ctx1, ctx2)
 
