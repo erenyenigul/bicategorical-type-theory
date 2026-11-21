@@ -37,19 +37,18 @@ let rec check_context : context -> unit = function
   | Nil -> ()
   | Extend (ty, rest) ->
     check_context rest;
-    check_ty rest ty;
-    ()
+    assert_context_equality (check_ty ty) rest
 
-(* Assumes the context is well-formed *)
-and check_ty (ctx: context) (t: ty) : unit = match t with
-  | BaseTy (_, ctx0) ->
-    check_context ctx0;
-    assert_context_equality ctx0 ctx
+(* Returns the context the type lives in *)
+and check_ty : ty -> context = function
+  | BaseTy (_, ctx) ->
+    check_context ctx;
+    ctx
   | SubTy (ty, sub) ->
     let boundary = check_substitution sub in
 
-    check_ty boundary.codomain ty;
-    assert_context_equality boundary.domain ctx
+    assert_context_equality (check_ty ty) boundary.codomain;
+    boundary.domain
 
 and raise_check_error (error: type_error) : unit =
   raise (CheckError error)
@@ -125,9 +124,11 @@ and check_substitution : substitution -> substitution_boundary = function
     { domain = boundary1.domain; codomain = boundary2.codomain }
   | Weaken (ctx, ty) ->
     check_context ctx;
-    check_ty ctx ty;
+    assert_context_equality (check_ty ty) ctx;
     { domain = Extend (ty, ctx); codomain = ctx }
-  | ExtendConTm _ -> failwith "TODO: check_substitution ExtendConTm"
+  | ExtendConTm t ->
+    let boundary = check_term t in
+    { domain = Extend (boundary.domain, boundary.context); codomain = Extend (boundary.codomain, boundary.context) }
 
 and check_substitution_reduction : substitution_reduction -> substitution_reduction_boundary = function
   | Id sub -> 
@@ -166,12 +167,15 @@ and check_substitution_reduction : substitution_reduction -> substitution_reduct
 
       { domain = Compose (boundary_red.domain, sub); codomain = Compose (boundary_red.codomain, sub); parallel = {domain = boundary_red.parallel.domain; codomain = boundary_sub.codomain } }
 
-  | ExtendConRed _ -> failwith "TODO: check_substitution_reduction ExtendConRed"
+  | ExtendConRed red ->
+      let boundary_red = check_term_reduction red in
+
+      { domain = ExtendConTm boundary_red.domain; codomain = ExtendConTm boundary_red.codomain; parallel = {domain = Extend (boundary_red.parallel.domain, boundary_red.context); codomain = Extend (boundary_red.parallel.codomain, boundary_red.context) } }
 
 and check_term : term -> term_boundary = function
   | Id (ctx, ty) ->
       check_context ctx;
-      check_ty ctx ty;
+      assert_context_equality (check_ty ty) ctx;
       {
         context = ctx;
         domain = ty;
@@ -180,8 +184,8 @@ and check_term : term -> term_boundary = function
 
   | Var (name, ctx, ty1, ty2) ->
       check_context ctx;
-      check_ty ctx ty1;
-      check_ty ctx ty2;
+      assert_context_equality (check_ty ty1) ctx;
+      assert_context_equality (check_ty ty2) ctx;
       
       {
         context = ctx;
@@ -206,8 +210,6 @@ and check_term : term -> term_boundary = function
       let boundary_sub = check_substitution sub in
 
       assert_context_equality boundary_tm.context boundary_sub.codomain;
-      check_ty boundary_sub.codomain boundary_tm.domain;
-      check_ty boundary_sub.codomain boundary_tm.codomain;
 
       {
         context = boundary_sub.domain;
@@ -300,7 +302,7 @@ and check_judgement : judgement -> unit = function
     assert_substitution_reduction_equality red1 red2
   | Type (ctx, t) ->
       check_context ctx;
-      check_ty ctx t
+      assert_context_equality (check_ty t) ctx
 
   | Term term -> check_term term |> ignore
   | TermReduction red -> check_term_reduction red |> ignore
@@ -330,8 +332,8 @@ and check_judgement : judgement -> unit = function
 
   | TypeEquality (ctx, t1, t2) ->
     check_context ctx;
-    check_ty ctx t1;
-    check_ty ctx t2;
+    assert_context_equality (check_ty t1) ctx;
+    assert_context_equality (check_ty t2) ctx;
 
     assert_ty_equality t1 t2
 
