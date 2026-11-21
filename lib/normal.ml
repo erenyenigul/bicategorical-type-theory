@@ -280,10 +280,20 @@ and compose_nf_substitution (nf_sub1: nf_substitution) (nf_sub2: nf_substitution
   if is_id_substitution nf_sub1 then nf_sub2
   else if is_id_substitution nf_sub2 then nf_sub1
   else
-  { 
-      domain = nf_sub1.domain; 
+    (* extend-con-Tm: (Γ.g) π_T ≡ π_S, for g : S → T.
+       Both sides are already normal, so cancellation only happens at the
+       seam: drop the trailing Exts of the left against a leading Pi of the
+       right. The Pi then starts where the dropped Ext started (π_S). *)
+    let rec cancel (rev_left : nf_substitution_gen list) (right : nf_substitution_gen list) =
+      match rev_left, right with
+      | ({ name = Ext _; _ } as ext) :: rev_left', ({ name = Pi; _ } as pi) :: right' ->
+        cancel rev_left' ({ pi with domain = ext.domain } :: right')
+      | _ -> List.rev_append rev_left right
+    in
+    {
+      domain = nf_sub1.domain;
       codomain = nf_sub2.codomain;
-      gens = nf_sub1.gens @ nf_sub2.gens
+      gens = cancel (List.rev nf_sub1.gens) nf_sub2.gens
     }
 
 and compose_nf_term (nf_term1: nf_term) (nf_term2: nf_term) : nf_term = 
