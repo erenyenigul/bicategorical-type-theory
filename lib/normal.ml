@@ -276,7 +276,9 @@ and normalize_context (ctx: context) : nf_context = match ctx with
   | Nil -> []
   | Extend (t, ctx') -> (normalize_ty t) :: normalize_context ctx'
 
-and compose_nf_substitution (nf_sub1: nf_substitution) (nf_sub2: nf_substitution) : nf_substitution = 
+(* [~cancel:false] keeps Ext·π as two generators. Diagrams need this: their
+   wires are the raw word, so a reduction on Γ.t is not lost when π follows. *)
+and compose_nf_substitution ?(cancel = true) (nf_sub1: nf_substitution) (nf_sub2: nf_substitution) : nf_substitution =
   if is_id_substitution nf_sub1 then nf_sub2
   else if is_id_substitution nf_sub2 then nf_sub1
   else
@@ -284,16 +286,18 @@ and compose_nf_substitution (nf_sub1: nf_substitution) (nf_sub2: nf_substitution
        Both sides are already normal, so cancellation only happens at the
        seam: drop the trailing Exts of the left against a leading Pi of the
        right. The Pi then starts where the dropped Ext started (π_S). *)
-    let rec cancel (rev_left : nf_substitution_gen list) (right : nf_substitution_gen list) =
+    let rec cancel_ext_pi (rev_left : nf_substitution_gen list) (right : nf_substitution_gen list) =
       match rev_left, right with
       | ({ name = Ext _; _ } as ext) :: rev_left', ({ name = Pi; _ } as pi) :: right' ->
-        cancel rev_left' ({ pi with domain = ext.domain } :: right')
+        cancel_ext_pi rev_left' ({ pi with domain = ext.domain } :: right')
       | _ -> List.rev_append rev_left right
     in
     {
       domain = nf_sub1.domain;
       codomain = nf_sub2.codomain;
-      gens = cancel (List.rev nf_sub1.gens) nf_sub2.gens
+      gens =
+        if cancel then cancel_ext_pi (List.rev nf_sub1.gens) nf_sub2.gens
+        else nf_sub1.gens @ nf_sub2.gens
     }
 
 and compose_nf_term (nf_term1: nf_term) (nf_term2: nf_term) : nf_term = 
@@ -307,7 +311,7 @@ and compose_nf_term (nf_term1: nf_term) (nf_term2: nf_term) : nf_term =
       gens = nf_term1.gens @ nf_term2.gens
     }
 
-and normalize_substitution (sub: substitution) : nf_substitution = match sub with
+and normalize_substitution ?(cancel = true) (sub: substitution) : nf_substitution = match sub with
   | Id ctx -> 
     let nf_ctx = normalize_context ctx in
     identity_substitution nf_ctx
@@ -323,9 +327,9 @@ and normalize_substitution (sub: substitution) : nf_substitution = match sub wit
     }
 
   | Compose (sub1, sub2) ->
-    let nf_sub1 = normalize_substitution sub1 in
-    let nf_sub2 = normalize_substitution sub2 in
-    compose_nf_substitution nf_sub1 nf_sub2
+    let nf_sub1 = normalize_substitution ~cancel sub1 in
+    let nf_sub2 = normalize_substitution ~cancel sub2 in
+    compose_nf_substitution ~cancel nf_sub1 nf_sub2
 
   | Weaken (ctx, ty) ->
     let nf_ctx = normalize_context ctx in
@@ -353,15 +357,16 @@ and normalize_substitution (sub: substitution) : nf_substitution = match sub wit
         }) nf_tm.gens
     }
 
+(* Wires are raw words (~cancel:false), see compose_nf_substitution. *)
 and diagram_of_substitution_reduction : substitution_reduction -> nf_substitution_reduction = function
-    | Id sub -> 
-      let nf_sub = normalize_substitution sub in
+    | Id sub ->
+      let nf_sub = normalize_substitution ~cancel:false sub in
 
       identity_substitution_reduction nf_sub
 
     | Var (s, sub1, sub2) ->
-      let nf_sub1 = normalize_substitution sub1 in
-      let nf_sub2 = normalize_substitution sub2 in
+      let nf_sub1 = normalize_substitution ~cancel:false sub1 in
+      let nf_sub2 = normalize_substitution ~cancel:false sub2 in
 
       {
         domain = nf_sub1;
@@ -387,11 +392,11 @@ and diagram_of_substitution_reduction : substitution_reduction -> nf_substitutio
     | LeftWhisker (sub, red) ->
       (* s ◁ α: shift offsets by |s| *)
       let nf_red = diagram_of_substitution_reduction red in
-      let nf_sub = normalize_substitution sub in
+      let nf_sub = normalize_substitution ~cancel:false sub in
       let shift = List.length nf_sub.gens in
 
       {
-        domain = compose_nf_substitution nf_sub nf_red.domain;
+        domain = compose_nf_substitution ~cancel:false nf_sub nf_red.domain;
         slices = List.map (fun (slice: nf_substitution_reduction_slice) ->
           { slice with offset = slice.offset + shift }) nf_red.slices;
       }
@@ -399,10 +404,10 @@ and diagram_of_substitution_reduction : substitution_reduction -> nf_substitutio
     | RightWhisker (red, sub) ->
       (* α ▷ s: offsets unchanged *)
       let nf_red = diagram_of_substitution_reduction red in
-      let nf_sub = normalize_substitution sub in
+      let nf_sub = normalize_substitution ~cancel:false sub in
 
       {
-        domain = compose_nf_substitution nf_red.domain nf_sub;
+        domain = compose_nf_substitution ~cancel:false nf_red.domain nf_sub;
         slices = nf_red.slices;
       }
     | ExtendConRed _ -> failwith "TODO: diagram_of_substitution_reduction ExtendConRed"
