@@ -219,7 +219,7 @@ and check_term : term -> term_boundary = function
 
   | Map (ty, red) ->
     let boundary_red = check_substitution_reduction red in
-    assert_context_equality (check_ty ty) boundary_red.parallel.domain;
+    assert_context_equality (check_ty ty) boundary_red.parallel.codomain;
 
     {
       context = boundary_red.parallel.domain;
