@@ -4,6 +4,7 @@ type nf_context = nf_ty list
 
 and nf_substitution_gen_name =
   | Gen of string
+  | Ext of nf_term_gen
   | Pi
 
 and nf_substitution_gen = {
@@ -267,7 +268,8 @@ and normalize_term : term -> nf_term = function
     let nf_t = normalize_term t in
     let nf_sub = normalize_substitution sub in
     subst_nf_term nf_t nf_sub
-  | Map (_, _) -> failwith "TODO: normalize_term Map"
+  | Map (ty, red) -> failwith "TODO: normalize_term Map"
+
 
 
 and normalize_context (ctx: context) : nf_context = match ctx with
@@ -327,7 +329,19 @@ and normalize_substitution (sub: substitution) : nf_substitution = match sub wit
         { name = Pi ; domain = nf_ctx'; codomain = nf_ctx }
       ];
     }
-  | ExtendConTm _ -> failwith "TODO: normalize_substitution ExtendConTm"
+  | ExtendConTm tm -> 
+    let nf_tm = normalize_term tm in
+    
+    {
+      domain = (nf_tm.domain :: nf_tm.context);
+      codomain = (nf_tm.codomain :: nf_tm.context);
+      gens = List.map (fun nf_tm_gen -> 
+        { 
+          name = Ext nf_tm_gen;
+          domain = (nf_tm_gen.domain :: nf_tm.context); 
+          codomain = (nf_tm_gen.codomain :: nf_tm.context) 
+        }) nf_tm.gens
+    }
 
 and diagram_of_substitution_reduction : substitution_reduction -> nf_substitution_reduction = function
     | Id sub -> 
