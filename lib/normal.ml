@@ -24,15 +24,15 @@ and nf_substitution_reduction_gen = {
   codomain: nf_substitution;
 }
 
+(* One generator, [offset] wires from the left of the level above it. *)
 and nf_substitution_reduction_slice = {
-  left_whiskers: nf_substitution_gen list;
+  offset: int;
   gen: nf_substitution_reduction_gen;
-  right_whiskers: nf_substitution_gen list;
 }
 
+(* Source 1-cell and slices, top to bottom. *)
 and nf_substitution_reduction = {
   domain: nf_substitution;
-  codomain: nf_substitution;
   slices: nf_substitution_reduction_slice list
 }
 
@@ -63,15 +63,13 @@ and nf_term_reduction_gen = {
 }
 
 and nf_term_reduction_slice = {
-  left_whiskers: nf_term_gen list;
+  offset: int;
   gen: nf_term_reduction_gen;
-  right_whiskers: nf_term_gen list;
 }
 
 and nf_term_reduction = {
   context: nf_context;
   domain: nf_term;
-  codomain: nf_term;
   slices: nf_term_reduction_slice list
 }
 
@@ -85,7 +83,6 @@ let rec identity_substitution (nf_ctx: nf_context) : nf_substitution =
 and identity_substitution_reduction (nf_sub: nf_substitution) : nf_substitution_reduction = 
   {
     domain = nf_sub;
-    codomain = nf_sub;
     slices = [];
   }
 
@@ -107,7 +104,6 @@ and identity_term_reduction (nf_term: nf_term) : nf_term_reduction =
   {
     context = nf_term.context;
     domain = nf_term;
-    codomain = nf_term;
     slices = [];
   }
 
@@ -154,21 +150,20 @@ and subst_nf_term_reduction_gen (gen: nf_term_reduction_gen) (sub: nf_substituti
 and subst_nf_term_reduction_slice 
     (slice: nf_term_reduction_slice) 
     (sub: nf_substitution) : nf_term_reduction_slice =
+  (* offsets unchanged: each generator maps to one generator *)
   if is_id_substitution sub then slice
   else
   {
-    left_whiskers  = List.map (fun g -> subst_nf_term_gen g sub) slice.left_whiskers;
-    gen            = subst_nf_term_reduction_gen slice.gen sub;
-    right_whiskers = List.map (fun g -> subst_nf_term_gen g sub) slice.right_whiskers;
+    offset = slice.offset;
+    gen    = subst_nf_term_reduction_gen slice.gen sub;
   }
 
-and subst_nf_term_reduction (red: nf_term_reduction) (sub: nf_substitution) : nf_term_reduction = 
+and subst_nf_term_reduction (red: nf_term_reduction) (sub: nf_substitution) : nf_term_reduction =
   if is_id_substitution sub then red
   else
-  { 
-    context = sub.domain; 
-    domain = subst_nf_term red.domain sub; 
-    codomain = subst_nf_term red.codomain sub; 
+  {
+    context = sub.domain;
+    domain = subst_nf_term red.domain sub;
     slices = List.map (fun s -> subst_nf_term_reduction_slice s sub) red.slices
   }
 
@@ -279,10 +274,8 @@ and normalize_substitution_reduction : substitution_reduction -> nf_substitution
 
       {
         domain = nf_sub1;
-        codomain = nf_sub2;
         slices = [{
-          left_whiskers = [];
-          right_whiskers = [];
+          offset = 0;
           gen = {
             domain = nf_sub1;
             codomain = nf_sub2;
@@ -297,44 +290,29 @@ and normalize_substitution_reduction : substitution_reduction -> nf_substitution
 
       {
         domain = nf_red1.domain;
-        codomain = nf_red2.codomain;
         slices = nf_red1.slices @ nf_red2.slices;
       }
-    
+
     | LeftWhisker (sub, red) ->
+      (* s ◁ α: shift offsets by |s| *)
       let nf_red = normalize_substitution_reduction red in
       let nf_sub = normalize_substitution sub in
-      
-      let domain = compose_nf_substitution nf_sub nf_red.domain in
-      let codomain = compose_nf_substitution nf_sub nf_red.codomain in
-      let slices = List.map (fun (slice: nf_substitution_reduction_slice) -> { 
-        left_whiskers = nf_sub.gens @ slice.left_whiskers;
-        right_whiskers = slice.right_whiskers;
-        gen = slice.gen;
-      }) nf_red.slices in
+      let shift = List.length nf_sub.gens in
 
       {
-        domain;
-        codomain;
-        slices;
+        domain = compose_nf_substitution nf_sub nf_red.domain;
+        slices = List.map (fun (slice: nf_substitution_reduction_slice) ->
+          { slice with offset = slice.offset + shift }) nf_red.slices;
       }
 
     | RightWhisker (red, sub) ->
+      (* α ▷ s: offsets unchanged *)
       let nf_red = normalize_substitution_reduction red in
       let nf_sub = normalize_substitution sub in
-      
-      let domain = compose_nf_substitution nf_red.domain nf_sub in
-      let codomain = compose_nf_substitution nf_red.codomain nf_sub in
-      let slices = List.map (fun (slice: nf_substitution_reduction_slice) -> { 
-        left_whiskers =  slice.left_whiskers;
-        right_whiskers = slice.right_whiskers @ nf_sub.gens;
-        gen = slice.gen;
-      }) nf_red.slices in
 
       {
-        domain;
-        codomain;
-        slices;
+        domain = compose_nf_substitution nf_red.domain nf_sub;
+        slices = nf_red.slices;
       }
     | ExtendConRed _ -> failwith "TODO: normalize_substitution_reduction ExtendConRed"
 
@@ -352,10 +330,8 @@ and normalize_term_reduction : term_reduction -> nf_term_reduction = function
     {
         context = nf_term1.context;
         domain = nf_term1;
-        codomain = nf_term2;
         slices = [{
-          left_whiskers = [];
-          right_whiskers = [];
+          offset = 0;
           gen = {
             domain = nf_term1;
             codomain = nf_term2;
@@ -372,52 +348,31 @@ and normalize_term_reduction : term_reduction -> nf_term_reduction = function
     {
       context = nf_red1.context;
       domain = nf_red1.domain;
-      codomain = nf_red2.codomain;
       slices = nf_red1.slices @ nf_red2.slices;
     }
 
   | LeftWhisker (term, red) ->
+    (* t ◁ α: shift offsets by |t| *)
     let nf_term = normalize_term term in
     let nf_red  = normalize_term_reduction red in
-    
-    let context = nf_red.context in
-
-    let domain = compose_nf_term nf_term nf_red.domain in
-    let codomain = compose_nf_term nf_term nf_red.codomain in
-
-    let slices = List.map (fun (slice: nf_term_reduction_slice) : nf_term_reduction_slice -> {
-      left_whiskers = nf_term.gens @ slice.left_whiskers;
-      right_whiskers = slice.right_whiskers;
-      gen = slice.gen;
-    }) nf_red.slices in
+    let shift = List.length nf_term.gens in
 
     {
-      context;
-      domain;
-      codomain;
-      slices;
+      context = nf_red.context;
+      domain = compose_nf_term nf_term nf_red.domain;
+      slices = List.map (fun (slice: nf_term_reduction_slice) : nf_term_reduction_slice ->
+        { slice with offset = slice.offset + shift }) nf_red.slices;
     }
 
   | RightWhisker (red, term) ->
+    (* α ▷ t: offsets unchanged *)
     let nf_red = normalize_term_reduction red in
     let nf_term = normalize_term term in
 
-    let context = nf_red.context in
-    
-    let domain = compose_nf_term nf_red.domain nf_term in
-    let codomain = compose_nf_term nf_red.codomain nf_term in
-
-    let slices = List.map (fun (slice: nf_term_reduction_slice) : nf_term_reduction_slice -> {
-      left_whiskers = slice.left_whiskers;
-      right_whiskers = slice.right_whiskers @ nf_term.gens;
-      gen = slice.gen;
-    }) nf_red.slices in
-
     {
-      context;
-      domain;
-      codomain;
-      slices;
+      context = nf_red.context;
+      domain = compose_nf_term nf_red.domain nf_term;
+      slices = nf_red.slices;
     }
 
   | SubRed (red, sub) ->
