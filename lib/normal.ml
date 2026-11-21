@@ -25,16 +25,20 @@ and nf_substitution_reduction_gen = {
 }
 
 (* One generator, [offset] wires from the left of the level above it. *)
-and nf_substitution_reduction_slice = {
+and 'g slice = {
   offset: int;
-  gen: nf_substitution_reduction_gen;
+  gen: 'g;
 }
 
-(* Source 1-cell and slices, top to bottom. *)
-and nf_substitution_reduction = {
-  domain: nf_substitution;
-  slices: nf_substitution_reduction_slice list
+(* A 2-cell: source 1-cell and slices, top to bottom. *)
+and ('c, 'g) reduction = {
+  domain: 'c;
+  slices: 'g slice list;
 }
+
+and nf_substitution_reduction_slice = nf_substitution_reduction_gen slice
+
+and nf_substitution_reduction = (nf_substitution, nf_substitution_reduction_gen) reduction
 
 (* algebraic variant type so that it can be extended later by type formers *)
 and nf_ty = 
@@ -62,16 +66,10 @@ and nf_term_reduction_gen = {
   codomain: nf_term;
 }
 
-and nf_term_reduction_slice = {
-  offset: int;
-  gen: nf_term_reduction_gen;
-}
+and nf_term_reduction_slice = nf_term_reduction_gen slice
 
-and nf_term_reduction = {
-  context: nf_context;
-  domain: nf_term;
-  slices: nf_term_reduction_slice list
-}
+(* the context is [domain.context] *)
+and nf_term_reduction = (nf_term, nf_term_reduction_gen) reduction
 
 let rec identity_substitution (nf_ctx: nf_context) : nf_substitution = 
   {
@@ -102,7 +100,6 @@ and is_id_term (term : nf_term) : bool =
 
 and identity_term_reduction (nf_term: nf_term) : nf_term_reduction = 
   {
-    context = nf_term.context;
     domain = nf_term;
     slices = [];
   }
@@ -162,7 +159,6 @@ and subst_nf_term_reduction (red: nf_term_reduction) (sub: nf_substitution) : nf
   if is_id_substitution sub then red
   else
   {
-    context = sub.domain;
     domain = subst_nf_term red.domain sub;
     slices = List.map (fun s -> subst_nf_term_reduction_slice s sub) red.slices
   }
@@ -328,7 +324,6 @@ and normalize_term_reduction : term_reduction -> nf_term_reduction = function
     let nf_term2 = normalize_term term2 in
 
     {
-        context = nf_term1.context;
         domain = nf_term1;
         slices = [{
           offset = 0;
@@ -346,7 +341,6 @@ and normalize_term_reduction : term_reduction -> nf_term_reduction = function
     let nf_red2 = normalize_term_reduction red2 in
 
     {
-      context = nf_red1.context;
       domain = nf_red1.domain;
       slices = nf_red1.slices @ nf_red2.slices;
     }
@@ -358,7 +352,6 @@ and normalize_term_reduction : term_reduction -> nf_term_reduction = function
     let shift = List.length nf_term.gens in
 
     {
-      context = nf_red.context;
       domain = compose_nf_term nf_term nf_red.domain;
       slices = List.map (fun (slice: nf_term_reduction_slice) : nf_term_reduction_slice ->
         { slice with offset = slice.offset + shift }) nf_red.slices;
@@ -370,7 +363,6 @@ and normalize_term_reduction : term_reduction -> nf_term_reduction = function
     let nf_term = normalize_term term in
 
     {
-      context = nf_red.context;
       domain = compose_nf_term nf_red.domain nf_term;
       slices = nf_red.slices;
     }
