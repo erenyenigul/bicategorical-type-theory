@@ -9,10 +9,11 @@ license: "LICENSE"
 tags: ["add topics" "to describe" "your" "project"]
 homepage: "https://github.com/erenyenigul/bicategorical-type-theory"
 doc: "https://url/to/documentation"
-bug-reports: "https://github.com/erenyenigul/bicategorical-type-theory/issues"
+bug-reports:
+  "https://github.com/erenyenigul/bicategorical-type-theory/issues"
 depends: [
   "dune" {>= "3.23"}
-  "ocaml"
+  "ocaml" {>= "5.3"}
   "odoc" {with-doc}
 ]
 build: [

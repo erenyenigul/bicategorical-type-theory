@@ -1,3 +1,4 @@
+open Errors
 open Normal
 open Syntax
 open Result.Syntax
@@ -28,61 +29,9 @@ type term_reduction_boundary = {
     parallel: term_boundary;
 }
 
-type type_error = 
-  | ContextMismatch of {
-      location: string option;
-    }
-  | SubstitutionMismatch of {
-      location: string option;
-    }
-  | SubstitutionReductionMismatch of {
-      location: string option;
-    }
-  | TermMismatch of {
-      location: string option;
-    }
-  | TermReductionMismatch of {
-      location: string option;
-    }
-
-exception CheckError of type_error
-
 type checker_result =
  | Success 
  | Failure of type_error
-
-let string_of_type_error = function
-  | ContextMismatch { location } ->
-      let loc_str = match location with
-        | Some loc -> " at " ^ loc
-        | None -> ""
-      in
-      "Context mismatch" ^ loc_str
-  | SubstitutionMismatch { location } ->
-      let loc_str = match location with
-        | Some loc -> " at " ^ loc
-        | None -> ""
-      in
-      "Substitution mismatch" ^ loc_str
-  | SubstitutionReductionMismatch { location } ->
-      let loc_str = match location with
-        | Some loc -> " at " ^ loc
-        | None -> ""
-      in
-      "Substitution reduction mismatch" ^ loc_str
-  | TermMismatch { location } ->
-      let loc_str = match location with
-        | Some loc -> " at " ^ loc
-        | None -> ""
-      in
-      "Term mismatch" ^ loc_str
-  | TermReductionMismatch { location } ->
-      let loc_str = match location with
-        | Some loc -> " at " ^ loc
-        | None -> ""
-      in
-      "Term reduction mismatch" ^ loc_str
-
 
 let rec check_context : context -> unit = function
   | Nil -> ()

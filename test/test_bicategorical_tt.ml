@@ -47,7 +47,7 @@ let run_test (t : test) : bool =
   let outcome =
     match Check.check t.judgement with
     | Success -> Ok ()
-    | Failure err -> Error (Check.string_of_type_error err)
+    | Failure err -> Error (Errors.string_of_type_error err)
     | exception e -> Error ("exception " ^ Printexc.to_string e)
   in
   match t.expect, outcome with

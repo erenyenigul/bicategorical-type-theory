@@ -71,7 +71,78 @@ and nf_term_reduction_slice = nf_term_reduction_gen slice
 (* the context is [domain.context] *)
 and nf_term_reduction = (nf_term, nf_term_reduction_gen) reduction
 
-let rec identity_substitution (nf_ctx: nf_context) : nf_substitution = 
+(* ------------------------------------------------------------------ *)
+(* Interchange (Delpeuch & Vicary 2022)                                *)
+(*                                                                     *)
+(* Works on any list of slices. It only needs each generator's arity:  *)
+(* how many wires it consumes and produces.                            *)
+(* ------------------------------------------------------------------ *)
+
+(* Def. 2.15: every slice is connected to the boundary, or all slices are
+   connected to each other. Right exchange terminates on such diagrams;
+   on others (e.g. two scalars 1 ⇝ 1) it can swap forever.
+
+   Union-find over slices 0..n-1 and the boundary n. *)
+let is_boundary_connected ~arity ~source_width (slices : 'g slice list) : bool =
+  let n = List.length slices in
+  let boundary = n in
+  let parent = Array.init (n + 1)  Fun.id in
+  let rec find v = if parent.(v) = v then v else find parent.(v) in
+  let union a b = parent.(find a) <- find b in
+  let step (k, cut) s =
+    let ins, outs = arity s.gen in
+    List.iter (union k) (List.take ins (List.drop s.offset cut));
+    let cut =
+      List.take s.offset cut
+      @ List.init outs (fun _ -> k)
+      @ List.drop (s.offset + ins) cut
+    in
+    (k + 1, cut)
+  in
+  let source = List.init source_width (fun _ -> boundary) in
+  let _, target = List.fold_left step (0, source) slices in
+  List.iter (union boundary) target;
+  List.for_all (fun k -> find k = find 0) (List.init n Fun.id)
+
+(* Defs 1.13–1.14: a right exchange swaps [upper] and the slice [lower]
+   right below it when [lower] lies entirely to the left of [upper]'s
+   outputs. [lower] moves up and keeps its offset; [upper] moves down and
+   shifts by how much [lower] changes the width. *)
+let can_exchange ~arity (upper : 'g slice) (lower : 'g slice) : bool =
+  let lower_ins, _ = arity lower.gen in
+  upper.offset >= lower.offset + lower_ins
+
+let exchange ~arity (upper : 'g slice) (lower : 'g slice) : 'g slice * 'g slice =
+  let lower_ins, lower_outs = arity lower.gen in
+  (lower, { upper with offset = upper.offset + lower_outs - lower_ins })
+
+(* Apply the first right exchange from the top, if any. *)
+let rec exchange_once ~arity (slices : 'g slice list) : 'g slice list option =
+  match slices with
+  | upper :: lower :: rest when can_exchange ~arity upper lower ->
+    let lower', upper' = exchange ~arity upper lower in
+    Some (lower' :: upper' :: rest)
+  | s :: rest -> Option.map (List.cons s) (exchange_once ~arity rest)
+  | [] -> None
+
+(* Apply right exchanges until none applies (Thm 4.2: the result is unique
+   for boundary-connected diagrams). Other diagrams are rejected. *)
+let interchange_normal_form ~arity ~source_width (slices : 'g slice list) : 'g slice list =
+  let rec loop slices =
+    match exchange_once ~arity slices with
+    | Some slices' -> loop slices'
+    | None -> slices
+  in
+  if is_boundary_connected ~arity ~source_width slices then loop slices
+  else raise (Errors.CheckError (Errors.Unsupported "diagram is not boundary-connected"))
+
+let substitution_reduction_arity (g : nf_substitution_reduction_gen) : int * int =
+  (List.length g.domain.gens, List.length g.codomain.gens)
+
+let term_reduction_arity (g : nf_term_reduction_gen) : int * int =
+  (List.length g.domain.gens, List.length g.codomain.gens)
+
+let rec identity_substitution (nf_ctx: nf_context) : nf_substitution =
   {
     domain = nf_ctx;
     codomain = nf_ctx;
@@ -258,7 +329,7 @@ and normalize_substitution (sub: substitution) : nf_substitution = match sub wit
     }
   | ExtendConTm _ -> failwith "TODO: normalize_substitution ExtendConTm"
 
-and normalize_substitution_reduction : substitution_reduction -> nf_substitution_reduction = function
+and diagram_of_substitution_reduction : substitution_reduction -> nf_substitution_reduction = function
     | Id sub -> 
       let nf_sub = normalize_substitution sub in
 
@@ -281,8 +352,8 @@ and normalize_substitution_reduction : substitution_reduction -> nf_substitution
       }
 
     | Compose (red1, red2) ->
-      let nf_red1 = normalize_substitution_reduction red1 in
-      let nf_red2 = normalize_substitution_reduction red2 in
+      let nf_red1 = diagram_of_substitution_reduction red1 in
+      let nf_red2 = diagram_of_substitution_reduction red2 in
 
       {
         domain = nf_red1.domain;
@@ -291,7 +362,7 @@ and normalize_substitution_reduction : substitution_reduction -> nf_substitution
 
     | LeftWhisker (sub, red) ->
       (* s ◁ α: shift offsets by |s| *)
-      let nf_red = normalize_substitution_reduction red in
+      let nf_red = diagram_of_substitution_reduction red in
       let nf_sub = normalize_substitution sub in
       let shift = List.length nf_sub.gens in
 
@@ -303,16 +374,16 @@ and normalize_substitution_reduction : substitution_reduction -> nf_substitution
 
     | RightWhisker (red, sub) ->
       (* α ▷ s: offsets unchanged *)
-      let nf_red = normalize_substitution_reduction red in
+      let nf_red = diagram_of_substitution_reduction red in
       let nf_sub = normalize_substitution sub in
 
       {
         domain = compose_nf_substitution nf_red.domain nf_sub;
         slices = nf_red.slices;
       }
-    | ExtendConRed _ -> failwith "TODO: normalize_substitution_reduction ExtendConRed"
+    | ExtendConRed _ -> failwith "TODO: diagram_of_substitution_reduction ExtendConRed"
 
-and normalize_term_reduction : term_reduction -> nf_term_reduction = function
+and diagram_of_term_reduction : term_reduction -> nf_term_reduction = function
   | Id term ->
     let nf_term = normalize_term term in
 
@@ -337,8 +408,8 @@ and normalize_term_reduction : term_reduction -> nf_term_reduction = function
       }
 
   | Compose (red1, red2) -> 
-    let nf_red1 = normalize_term_reduction red1 in
-    let nf_red2 = normalize_term_reduction red2 in
+    let nf_red1 = diagram_of_term_reduction red1 in
+    let nf_red2 = diagram_of_term_reduction red2 in
 
     {
       domain = nf_red1.domain;
@@ -348,7 +419,7 @@ and normalize_term_reduction : term_reduction -> nf_term_reduction = function
   | LeftWhisker (term, red) ->
     (* t ◁ α: shift offsets by |t| *)
     let nf_term = normalize_term term in
-    let nf_red  = normalize_term_reduction red in
+    let nf_red  = diagram_of_term_reduction red in
     let shift = List.length nf_term.gens in
 
     {
@@ -359,7 +430,7 @@ and normalize_term_reduction : term_reduction -> nf_term_reduction = function
 
   | RightWhisker (red, term) ->
     (* α ▷ t: offsets unchanged *)
-    let nf_red = normalize_term_reduction red in
+    let nf_red = diagram_of_term_reduction red in
     let nf_term = normalize_term term in
 
     {
@@ -368,7 +439,24 @@ and normalize_term_reduction : term_reduction -> nf_term_reduction = function
     }
 
   | SubRed (red, sub) ->
-    let nf_red = normalize_term_reduction red in
+    let nf_red = diagram_of_term_reduction red in
     let nf_sub = normalize_substitution sub in
 
     subst_nf_term_reduction nf_red nf_sub
+
+(* Syntax → diagram → normal form modulo interchange. *)
+and normalize_substitution_reduction (red : substitution_reduction) : nf_substitution_reduction =
+  let d = diagram_of_substitution_reduction red in
+  { d with slices =
+      interchange_normal_form
+        ~arity:substitution_reduction_arity
+        ~source_width:(List.length d.domain.gens)
+        d.slices }
+
+and normalize_term_reduction (red : term_reduction) : nf_term_reduction =
+  let d = diagram_of_term_reduction red in
+  { d with slices =
+      interchange_normal_form
+        ~arity:term_reduction_arity
+        ~source_width:(List.length d.domain.gens)
+        d.slices }

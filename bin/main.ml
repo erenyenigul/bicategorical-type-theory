@@ -16,4 +16,4 @@ let () =
     match result with
     | Success -> print_endline "Substitution reduction check passed."
     | Failure (err) ->
-        print_endline ("Substitution reduction check failed: " ^ (Check.string_of_type_error err))
+        print_endline ("Substitution reduction check failed: " ^ (Errors.string_of_type_error err))
