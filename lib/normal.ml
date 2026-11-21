@@ -112,7 +112,7 @@ and identity_term_reduction (nf_term: nf_term) : nf_term_reduction =
   }
 
 and normalize_ty: ty -> nf_ty = function 
-  | BaseTy s -> NfBaseTy s
+  | BaseTy (s, _) -> NfBaseTy s
   | SubTy (t, sub) ->  subst_nf_ty (normalize_ty t) (normalize_substitution sub)
 
 and subst_nf_ty (s: nf_ty) (sub: nf_substitution) : nf_ty = 
@@ -205,6 +205,7 @@ and normalize_term : term -> nf_term = function
     let nf_t = normalize_term t in
     let nf_sub = normalize_substitution sub in
     subst_nf_term nf_t nf_sub
+  | Map (_, _) -> failwith "TODO: normalize_term Map"
 
 
 and normalize_context (ctx: context) : nf_context = match ctx with
@@ -264,6 +265,7 @@ and normalize_substitution (sub: substitution) : nf_substitution = match sub wit
         { name = Pi ; domain = nf_ctx'; codomain = nf_ctx }
       ];
     }
+  | ExtendConTm _ -> failwith "TODO: normalize_substitution ExtendConTm"
 
 and normalize_substitution_reduction : substitution_reduction -> nf_substitution_reduction = function
     | Id sub -> 
@@ -334,6 +336,7 @@ and normalize_substitution_reduction : substitution_reduction -> nf_substitution
         codomain;
         slices;
       }
+    | ExtendConRed _ -> failwith "TODO: normalize_substitution_reduction ExtendConRed"
 
 and normalize_term_reduction : term_reduction -> nf_term_reduction = function
   | Id term ->

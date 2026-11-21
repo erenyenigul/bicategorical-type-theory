@@ -7,7 +7,7 @@ and substitution =
   | Var of string * context * context
   | Compose of substitution * substitution
   | Weaken of context * ty 
-  (*| ExtendConTm of term *)
+  | ExtendConTm of term                   (* Γ.t : Γ.S → Γ.T *)
 
 and substitution_reduction =
   | Id of substitution
@@ -15,10 +15,10 @@ and substitution_reduction =
   | Compose of substitution_reduction * substitution_reduction
   | LeftWhisker of substitution * substitution_reduction
   | RightWhisker of substitution_reduction * substitution
-  (*| ExtendConRed of term *)
+  | ExtendConRed of term_reduction        (* Γ.r : Γ.t ⇝ Γ.t' *)
 
 and ty =
-  | BaseTy of string
+  | BaseTy of string * context          (* X, declared as Γ₀ ⊢ X type *)
   | SubTy of ty * substitution
 
 and term = 
@@ -26,7 +26,7 @@ and term =
   | Var of string * context * ty * ty
   | Compose of term * term
   | SubTm of term * substitution
-  (*| Map of ty * substitution_reduction *)
+  | Map of ty * substitution_reduction    (* map T ρ : T[s] → T[s'] *)
 
 and term_reduction = 
   | Id of term
