@@ -256,6 +256,28 @@ and subst_nf_term_reduction (red: nf_term_reduction) (sub: nf_substitution) : nf
     slices = List.map (fun s -> subst_nf_term_reduction_slice s sub) red.slices
   }
 
+and compose_nf_term (nf_term1: nf_term) (nf_term2: nf_term) : nf_term = 
+  if is_id_term nf_term1 then nf_term2
+  else if is_id_term nf_term2 then nf_term1
+  else 
+    (* map-comp rule *)
+    let combine_maps (rev_left: nf_term_gen list) (right: nf_term_gen list) : nf_term_gen list =
+      match rev_left, right with
+      | ({ name = RedMap (ty, red); _ } as map) :: rev_left', 
+        ({ name = RedMap (ty', red'); _ } as map') :: right' when ty = ty' ->
+        List.rev_append rev_left' ({ map with
+            name = RedMap (ty, compose_nf_substitution_reduction red red');
+            codomain = map'.codomain;
+          } :: right')
+      | _ -> List.rev_append rev_left right
+    in 
+    { 
+      context = nf_term1.context;
+      domain = nf_term1.domain; 
+      codomain = nf_term2.codomain;
+      gens = combine_maps (List.rev nf_term1.gens) nf_term2.gens
+    }
+
 and normalize_term : term -> nf_term = function
   | Id (ctx, ty) -> 
     let nf_ctx = normalize_context ctx in
@@ -277,14 +299,11 @@ and normalize_term : term -> nf_term = function
       }] 
     }
   | Compose (t1, t2) ->
-    let nf_t1 = normalize_term t1 in
-    let nf_t2 = normalize_term t2 in
-    { 
-      context = nf_t1.context; 
-      domain = nf_t1.domain; 
-      codomain = nf_t2.codomain; 
-      gens = nf_t1.gens @ nf_t2.gens 
-    }
+    let nf_term1 = normalize_term t1 in
+    let nf_term2 = normalize_term t2 in
+    
+    compose_nf_term nf_term1 nf_term2
+
   | SubTm (t, sub) ->
     let nf_t = normalize_term t in
     let nf_sub = normalize_substitution sub in
@@ -314,9 +333,6 @@ and normalize_term : term -> nf_term = function
         }]
       }
 
-
-
-
 and normalize_context (ctx: context) : nf_context = match ctx with
   | Nil -> []
   | Extend (t, ctx') -> (normalize_ty t) :: normalize_context ctx'
@@ -343,17 +359,6 @@ and compose_nf_substitution ?(cancel = true) (nf_sub1: nf_substitution) (nf_sub2
       gens =
         if cancel then cancel_ext_pi (List.rev nf_sub1.gens) nf_sub2.gens
         else nf_sub1.gens @ nf_sub2.gens
-    }
-
-and compose_nf_term (nf_term1: nf_term) (nf_term2: nf_term) : nf_term = 
-  if is_id_term nf_term1 then nf_term2
-  else if is_id_term nf_term2 then nf_term1
-  else 
-  { 
-      context = nf_term1.context;
-      domain = nf_term1.domain; 
-      codomain = nf_term2.codomain;
-      gens = nf_term1.gens @ nf_term2.gens
     }
 
 and extend_con_nf_term (nf_tm: nf_term) : nf_substitution = 
@@ -404,6 +409,12 @@ and normalize_substitution ?(cancel = true) (sub: substitution) : nf_substitutio
     let nf_tm = normalize_term tm in
  
     extend_con_nf_term nf_tm
+
+and compose_nf_substitution_reduction (nf_red1 : nf_substitution_reduction) (nf_red2 : nf_substitution_reduction) =
+  { domain = nf_red1.domain;
+    slices = interchange_normal_form ~arity:substitution_reduction_arity
+               ~source_width:(List.length nf_red1.domain.gens) (nf_red1.slices @ nf_red2.slices) }
+
 
 (* Wires are raw words (~cancel:false), see compose_nf_substitution. *)
 and diagram_of_substitution_reduction : substitution_reduction -> nf_substitution_reduction = function
