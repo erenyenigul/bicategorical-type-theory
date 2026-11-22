@@ -21,7 +21,7 @@ and nf_substitution = {
 
 and nf_substitution_reduction_gen_name =
   | Gen of string
-  | RedExt of nf_term_reduction_gen
+  | RedExt of nf_term_reduction_gen 
 
 and nf_substitution_reduction_gen = {
   name: nf_substitution_reduction_gen_name;
@@ -49,8 +49,12 @@ and nf_substitution_reduction = (nf_substitution, nf_substitution_reduction_gen)
 and nf_ty = 
   | NfBaseTy of string
 
+and nf_term_gen_name =
+  | Gen of string
+  | RedMap of nf_ty * nf_substitution_reduction   (* map T α *)
+
 and nf_term_gen = {
-  name: string;
+  name: nf_term_gen_name;
   context: nf_context;
   sub: nf_substitution;
   domain: nf_ty;
@@ -75,6 +79,16 @@ and nf_term_reduction_slice = nf_term_reduction_gen slice
 
 (* the context is [domain.context] *)
 and nf_term_reduction = (nf_term, nf_term_reduction_gen) reduction
+
+
+let codomain_nf_substitution_reduction (nf_red : nf_substitution_reduction) : nf_substitution =
+  let step gens (s : nf_substitution_reduction_slice) =
+    let ins = List.length s.gen.domain.gens in
+    List.take s.offset gens @ s.gen.codomain.gens @ List.drop (s.offset + ins) gens
+  in
+  { nf_red.domain with gens = List.fold_left step nf_red.domain.gens nf_red.slices }
+
+
 
 (* ------------------------------------------------------------------ *)
 (* Interchange (Delpeuch & Vicary 2022)                                *)
@@ -253,7 +267,7 @@ and normalize_term : term -> nf_term = function
       context = nf_ctx; 
       domain = nf_ty1; codomain = nf_ty2; 
       gens = [{
-        name = s; 
+        name = Gen s; 
         sub = identity_substitution nf_ctx;
         context = nf_ctx; 
         domain = nf_ty1; codomain = nf_ty2 
@@ -272,7 +286,26 @@ and normalize_term : term -> nf_term = function
     let nf_t = normalize_term t in
     let nf_sub = normalize_substitution sub in
     subst_nf_term nf_t nf_sub
-  | Map (ty, red) -> failwith "TODO: normalize_term Map"
+  | Map (ty, red) -> 
+    let nf_ty = normalize_ty ty in
+    let nf_red = normalize_substitution_reduction red in
+    
+    let domain = subst_nf_ty nf_ty nf_red.domain in
+    let codomain = subst_nf_ty nf_ty (codomain_nf_substitution_reduction nf_red) in
+
+    {
+      context = nf_red.domain.domain;
+      domain = domain;
+      codomain = codomain;
+      gens = [{
+        name = RedMap (nf_ty, nf_red);
+        sub = identity_substitution nf_red.domain.domain;
+        context = nf_red.domain.domain;
+        domain = domain;
+        codomain = codomain;
+      }]
+    }
+
 
 
 
