@@ -209,13 +209,23 @@ and subst_nf_ty (s: nf_ty) (sub: nf_substitution) : nf_ty =
 and subst_nf_term_gen (gen: nf_term_gen) (sub: nf_substitution) : nf_term_gen = 
   if is_id_substitution sub then gen
   else
-  { 
-    name = gen.name; 
-    context = sub.domain;
-    sub = compose_nf_substitution sub gen.sub;
-    domain = subst_nf_ty gen.domain sub; 
-    codomain = subst_nf_ty gen.codomain sub; 
-  }
+    match gen.name with
+    | Gen name ->
+      { 
+        name = gen.name; 
+        context = sub.domain;
+        sub = compose_nf_substitution sub gen.sub;
+        domain = subst_nf_ty gen.domain sub; 
+        codomain = subst_nf_ty gen.codomain sub; 
+      }
+    | RedMap (ty, red) -> (* map-lwhisker rule *)
+      { 
+        name = RedMap (ty, (lwhisker_nf_substitution_reduction sub red));
+        context = sub.domain;
+        sub = identity_substitution sub.domain;
+        domain = subst_nf_ty gen.domain sub;
+        codomain = subst_nf_ty gen.codomain sub;
+      }
 
 and subst_nf_term (t: nf_term) (sub: nf_substitution) : nf_term = 
   if is_id_substitution sub then t
@@ -415,6 +425,11 @@ and compose_nf_substitution_reduction (nf_red1 : nf_substitution_reduction) (nf_
     slices = interchange_normal_form ~arity:substitution_reduction_arity
                ~source_width:(List.length nf_red1.domain.gens) (nf_red1.slices @ nf_red2.slices) }
 
+and lwhisker_nf_substitution_reduction (nf_sub : nf_substitution) (nf_red : nf_substitution_reduction) =
+  let shift = List.length nf_sub.gens in
+  { domain = compose_nf_substitution ~cancel:false nf_sub nf_red.domain;
+    slices = List.map (fun (slice: nf_substitution_reduction_slice) ->
+      { slice with offset = slice.offset + shift }) nf_red.slices }
 
 (* Wires are raw words (~cancel:false), see compose_nf_substitution. *)
 and diagram_of_substitution_reduction : substitution_reduction -> nf_substitution_reduction = function
@@ -452,13 +467,8 @@ and diagram_of_substitution_reduction : substitution_reduction -> nf_substitutio
       (* s ◁ α: shift offsets by |s| *)
       let nf_red = diagram_of_substitution_reduction red in
       let nf_sub = normalize_substitution ~cancel:false sub in
-      let shift = List.length nf_sub.gens in
 
-      {
-        domain = compose_nf_substitution ~cancel:false nf_sub nf_red.domain;
-        slices = List.map (fun (slice: nf_substitution_reduction_slice) ->
-          { slice with offset = slice.offset + shift }) nf_red.slices;
-      }
+      lwhisker_nf_substitution_reduction nf_sub nf_red
 
     | RightWhisker (red, sub) ->
       (* α ▷ s: offsets unchanged *)
