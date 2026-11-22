@@ -289,6 +289,8 @@ and normalize_term : term -> nf_term = function
     let nf_t = normalize_term t in
     let nf_sub = normalize_substitution sub in
     subst_nf_term nf_t nf_sub
+  | Map (SubTy (ty, s), red) ->
+    normalize_term (Map (ty, RightWhisker (red, s))) (* map-rwhisker *) 
   | Map (ty, red) -> 
     let nf_ty = normalize_ty ty in
     let nf_red = normalize_substitution_reduction red in
