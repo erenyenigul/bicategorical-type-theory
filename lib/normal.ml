@@ -47,7 +47,7 @@ and nf_substitution_reduction = (nf_substitution, nf_substitution_reduction_gen)
 
 (* algebraic variant type so that it can be extended later by type formers *)
 and nf_ty = 
-  | NfBaseTy of string
+  | NfBaseTy of string * nf_substitution   (* X[s], s : Δ → Γ₀ normal; X declared in Γ₀ *)
 
 and nf_term_gen_name =
   | Gen of string
@@ -87,6 +87,23 @@ let codomain_nf_substitution_reduction (nf_red : nf_substitution_reduction) : nf
     List.take s.offset gens @ s.gen.codomain.gens @ List.drop (s.offset + ins) gens
   in
   { nf_red.domain with gens = List.fold_left step nf_red.domain.gens nf_red.slices }
+
+(* extend-con-Tm: (Γ.g) π_T ≡ π_S, for g : S → T.
+   Works on any word, raw or not. Read left to right with a stack: a Pi
+   on top of an Ext removes the Ext and starts where it started (π_S),
+   then may cancel the next Ext below. *)
+let cancel_ext_pi (gens : nf_substitution_gen list) : nf_substitution_gen list =
+  let rec push (stack : nf_substitution_gen list) (g : nf_substitution_gen) =
+    match stack, g with
+    | ({ name = TermExt _; _ } as ext) :: rest, { name = Pi; _ } ->
+      push rest { g with domain = ext.domain }
+    | _ -> g :: stack
+  in
+  List.rev (List.fold_left push [] gens)
+
+(* Ext·π cancellation on a whole 1-cell: raw word → 1-cell normal form. *)
+let cancel_nf_substitution (s : nf_substitution) : nf_substitution =
+  { s with gens = cancel_ext_pi s.gens }
 
 
 
@@ -197,14 +214,15 @@ and identity_term_reduction (nf_term: nf_term) : nf_term_reduction =
     slices = [];
   }
 
-and normalize_ty: ty -> nf_ty = function 
-  | BaseTy (s, _) -> NfBaseTy s
+(* X declared in Γ₀ is X[1_Γ₀]: the identity records Γ₀. *)
+and normalize_ty: ty -> nf_ty = function
+  | BaseTy (x, ctx) -> NfBaseTy (x, identity_substitution (normalize_context ctx))
   | SubTy (t, sub) ->  subst_nf_ty (normalize_ty t) (normalize_substitution sub)
 
-and subst_nf_ty (s: nf_ty) (sub: nf_substitution) : nf_ty = 
-  if is_id_substitution sub then s
-  else match s with  
-  | NfBaseTy name -> NfBaseTy name (* here for historical reasons, and if we need to do smt with types under substitutions *)
+(* X[s][u] = X[u·s]. Composing with cancel also normalizes a raw [u]. *)
+and subst_nf_ty (ty: nf_ty) (u: nf_substitution) : nf_ty =
+  match ty with
+  | NfBaseTy (x, s) -> NfBaseTy (x, compose_nf_substitution ~cancel:true u s)
 
 and subst_nf_term_gen (gen: nf_term_gen) (sub: nf_substitution) : nf_term_gen = 
   if is_id_substitution sub then gen
@@ -324,8 +342,9 @@ and normalize_term : term -> nf_term = function
     let nf_ty = normalize_ty ty in
     let nf_red = normalize_substitution_reduction red in
     
-    let domain = subst_nf_ty nf_ty nf_red.domain in
-    let codomain = subst_nf_ty nf_ty (codomain_nf_substitution_reduction nf_red) in
+    (* the diagram's words are raw; the types T[s], T[s'] need them cancelled *)
+    let domain = subst_nf_ty nf_ty (cancel_nf_substitution nf_red.domain) in
+    let codomain = subst_nf_ty nf_ty (cancel_nf_substitution (codomain_nf_substitution_reduction nf_red)) in
 
     if is_id_reduction nf_red then (* map-id rule *)
       identity_term nf_red.domain.domain domain
@@ -350,26 +369,12 @@ and normalize_context (ctx: context) : nf_context = match ctx with
 (* [~cancel:false] keeps Ext·π as two generators. Diagrams need this: their
    wires are the raw word, so a reduction on Γ.t is not lost when π follows. *)
 and compose_nf_substitution ?(cancel = true) (nf_sub1: nf_substitution) (nf_sub2: nf_substitution) : nf_substitution =
-  if is_id_substitution nf_sub1 then nf_sub2
-  else if is_id_substitution nf_sub2 then nf_sub1
-  else
-    (* extend-con-Tm: (Γ.g) π_T ≡ π_S, for g : S → T.
-       Both sides are already normal, so cancellation only happens at the
-       seam: drop the trailing Exts of the left against a leading Pi of the
-       right. The Pi then starts where the dropped Ext started (π_S). *)
-    let rec cancel_ext_pi (rev_left : nf_substitution_gen list) (right : nf_substitution_gen list) =
-      match rev_left, right with
-      | ({ name = TermExt _; _ } as ext) :: rev_left', ({ name = Pi; _ } as pi) :: right' ->
-        cancel_ext_pi rev_left' ({ pi with domain = ext.domain } :: right')
-      | _ -> List.rev_append rev_left right
-    in
-    {
-      domain = nf_sub1.domain;
-      codomain = nf_sub2.codomain;
-      gens =
-        if cancel then cancel_ext_pi (List.rev nf_sub1.gens) nf_sub2.gens
-        else nf_sub1.gens @ nf_sub2.gens
-    }
+  let gens = nf_sub1.gens @ nf_sub2.gens in
+  {
+    domain = nf_sub1.domain;
+    codomain = nf_sub2.codomain;
+    gens = if cancel then cancel_ext_pi gens else gens
+  }
 
 and extend_con_nf_term (nf_tm: nf_term) : nf_substitution = 
     {

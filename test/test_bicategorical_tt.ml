@@ -369,6 +369,15 @@ let fig_3_5 =
     reject "T[s] is not a type in Γ" (Type (gamma, SubTy (ty_t, s)));
     reject "t[s] with substitution into the wrong context" (Term (sub_tm t s0));
     reject "T[s][s₀] ≢ T[s]" (TypeEquality (theta, SubTy (SubTy (ty_t, s), s0), SubTy (ty_t, s)));
+    (let s' = s_var "s'" delta gamma in
+     reject "T[s] ≢ T[s'] for distinct s, s'"
+       (TypeEquality (delta, SubTy (ty_t, s), SubTy (ty_t, s'))));
+    (let s' = s_var "s'" delta gamma in
+     let f = t_var "f" delta (SubTy (ty_t, s)) (SubTy (ty_t, s)) in
+     let g = t_var "g" delta (SubTy (ty_t, s')) (SubTy (ty_t, s')) in
+     reject "composition across T[s] and T[s'] fg" (Term (t_comp f g)));
+    reject "X declared in Δ ≢ X declared in Γ, weakened to Δ"
+      (TypeEquality (delta, BaseTy ("X", delta), SubTy (BaseTy ("X", gamma), Weaken (gamma, ty_b))));
   ]
 
 (* ------------------------------------------------------------------ *)
