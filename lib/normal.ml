@@ -4,7 +4,7 @@ type nf_context = nf_ty list
 
 and nf_substitution_gen_name =
   | Gen of string
-  | Ext of nf_term_gen
+  | TermExt of nf_term_gen
   | Pi
 
 and nf_substitution_gen = {
@@ -19,8 +19,12 @@ and nf_substitution = {
   gens: nf_substitution_gen list
 }
 
+and nf_substitution_reduction_gen_name =
+  | Gen of string
+  | RedExt of nf_term_reduction_gen
+
 and nf_substitution_reduction_gen = {
-  name: string;
+  name: nf_substitution_reduction_gen_name;
   domain  : nf_substitution;
   codomain: nf_substitution;
 }
@@ -288,7 +292,7 @@ and compose_nf_substitution ?(cancel = true) (nf_sub1: nf_substitution) (nf_sub2
        right. The Pi then starts where the dropped Ext started (π_S). *)
     let rec cancel_ext_pi (rev_left : nf_substitution_gen list) (right : nf_substitution_gen list) =
       match rev_left, right with
-      | ({ name = Ext _; _ } as ext) :: rev_left', ({ name = Pi; _ } as pi) :: right' ->
+      | ({ name = TermExt _; _ } as ext) :: rev_left', ({ name = Pi; _ } as pi) :: right' ->
         cancel_ext_pi rev_left' ({ pi with domain = ext.domain } :: right')
       | _ -> List.rev_append rev_left right
     in
@@ -309,6 +313,18 @@ and compose_nf_term (nf_term1: nf_term) (nf_term2: nf_term) : nf_term =
       domain = nf_term1.domain; 
       codomain = nf_term2.codomain;
       gens = nf_term1.gens @ nf_term2.gens
+    }
+
+and extend_con_nf_term (nf_tm: nf_term) : nf_substitution = 
+    {
+      domain = (nf_tm.domain :: nf_tm.context);
+      codomain = (nf_tm.codomain :: nf_tm.context);
+      gens = List.map (fun nf_tm_gen -> 
+        { 
+          name = TermExt nf_tm_gen;
+          domain = (nf_tm_gen.domain :: nf_tm.context); 
+          codomain = (nf_tm_gen.codomain :: nf_tm.context) 
+        }) nf_tm.gens
     }
 
 and normalize_substitution ?(cancel = true) (sub: substitution) : nf_substitution = match sub with
@@ -345,17 +361,8 @@ and normalize_substitution ?(cancel = true) (sub: substitution) : nf_substitutio
     }
   | ExtendConTm tm -> 
     let nf_tm = normalize_term tm in
-    
-    {
-      domain = (nf_tm.domain :: nf_tm.context);
-      codomain = (nf_tm.codomain :: nf_tm.context);
-      gens = List.map (fun nf_tm_gen -> 
-        { 
-          name = Ext nf_tm_gen;
-          domain = (nf_tm_gen.domain :: nf_tm.context); 
-          codomain = (nf_tm_gen.codomain :: nf_tm.context) 
-        }) nf_tm.gens
-    }
+ 
+    extend_con_nf_term nf_tm
 
 (* Wires are raw words (~cancel:false), see compose_nf_substitution. *)
 and diagram_of_substitution_reduction : substitution_reduction -> nf_substitution_reduction = function
@@ -375,7 +382,7 @@ and diagram_of_substitution_reduction : substitution_reduction -> nf_substitutio
           gen = {
             domain = nf_sub1;
             codomain = nf_sub2;
-            name = s;
+            name = Gen s;
           }
         }]
       }
@@ -410,7 +417,24 @@ and diagram_of_substitution_reduction : substitution_reduction -> nf_substitutio
         domain = compose_nf_substitution ~cancel:false nf_red.domain nf_sub;
         slices = nf_red.slices;
       }
-    | ExtendConRed _ -> failwith "TODO: diagram_of_substitution_reduction ExtendConRed"
+    | ExtendConRed red ->
+      let nf_red = normalize_term_reduction red in
+
+      {
+        domain = extend_con_nf_term nf_red.domain;
+        slices = List.map (
+          fun (slice: nf_term_reduction_slice) : nf_substitution_reduction_slice ->
+            {
+              offset = slice.offset;
+              gen = {
+                name = RedExt slice.gen;
+                domain = extend_con_nf_term slice.gen.domain;
+                codomain = extend_con_nf_term slice.gen.codomain;
+              }
+            }
+        ) nf_red.slices
+      }
+
 
 and diagram_of_term_reduction : term_reduction -> nf_term_reduction = function
   | Id term ->
