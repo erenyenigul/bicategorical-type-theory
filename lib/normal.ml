@@ -188,6 +188,9 @@ and is_id_substitution (sub : nf_substitution) : bool =
 and is_id_term (term : nf_term) : bool =
   term.gens = []
 
+and is_id_reduction (red : ('c, 'g) reduction) : bool =
+  red.slices = []
+
 and identity_term_reduction (nf_term: nf_term) : nf_term_reduction = 
   {
     domain = nf_term;
@@ -293,18 +296,21 @@ and normalize_term : term -> nf_term = function
     let domain = subst_nf_ty nf_ty nf_red.domain in
     let codomain = subst_nf_ty nf_ty (codomain_nf_substitution_reduction nf_red) in
 
-    {
-      context = nf_red.domain.domain;
-      domain = domain;
-      codomain = codomain;
-      gens = [{
-        name = RedMap (nf_ty, nf_red);
-        sub = identity_substitution nf_red.domain.domain;
+    if is_id_reduction nf_red then (* map-id rule *)
+      identity_term nf_red.domain.domain domain
+    else
+      {
         context = nf_red.domain.domain;
         domain = domain;
         codomain = codomain;
-      }]
-    }
+        gens = [{
+          name = RedMap (nf_ty, nf_red);
+          sub = identity_substitution nf_red.domain.domain;
+          context = nf_red.domain.domain;
+          domain = domain;
+          codomain = codomain;
+        }]
+      }
 
 
 
