@@ -36,14 +36,20 @@ let tr_rw (r : term_reduction) (t : term) : term_reduction = RightWhisker (r, t)
 (* ------------------------------------------------------------------ *)
 (* Test harness *)
 
-type expectation = Accept | Reject
+(* [Incomplete]: the judgement holds, but lies outside the fragment the
+   checker is complete for (seams, rew-tm, non-boundary-connected
+   diagrams). Rejecting it is expected; accepting it is reported. *)
+type expectation = Accept | Reject | Incomplete
 
 type test = { name : string; judgement : judgement; expect : expectation }
 
 let accept name judgement = { name; judgement; expect = Accept }
 let reject name judgement = { name; judgement; expect = Reject }
+let incomplete name judgement = { name; judgement; expect = Incomplete }
 
-let run_test (t : test) : bool =
+type result = Pass | Fail | Known
+
+let run_test (t : test) : result =
   let outcome =
     match Check.check t.judgement with
     | Success -> Ok ()
@@ -53,13 +59,19 @@ let run_test (t : test) : bool =
   match t.expect, outcome with
   | Accept, Ok () | Reject, Error _ ->
       Printf.printf "  [PASS] %s\n%!" t.name;
-      true
+      Pass
   | Accept, Error msg ->
       Printf.printf "  [FAIL] %s: expected acceptance, got: %s\n%!" t.name msg;
-      false
+      Fail
   | Reject, Ok () ->
       Printf.printf "  [FAIL] %s: expected rejection, but it was accepted\n%!" t.name;
-      false
+      Fail
+  | Incomplete, Error msg ->
+      Printf.printf "  [INCOMPLETE] %s: %s\n%!" t.name msg;
+      Known
+  | Incomplete, Ok () ->
+      Printf.printf "  [PASS] %s (now accepted: change [incomplete] to [accept])\n%!" t.name;
+      Pass
 
 (* ------------------------------------------------------------------ *)
 (* Shared fixtures *)
@@ -319,6 +331,11 @@ let fig_3_4 =
        let rho2 = tr_var "rho2" t t' in
        SubstitutionReductionEquality
          (sr_rw (sr_rw (ext_red rho) g) (pi ty_t), sr_rw (sr_rw (ext_red rho2) g) (pi ty_t)));
+    reject "θ ▷ π ≢ θ₂ ▷ π (θ : Γ.t ⇝ w is not a Γ.r, so no cancellation)"
+      (let ctx_t = Extend (ty_t, gamma) and ctx_s = Extend (ty_s, gamma) in
+       let w = s_var "w" ctx_s ctx_t in
+       let theta = sr_var "theta" (ext_tm t) w and theta2 = sr_var "theta2" (ext_tm t) w in
+       SubstitutionReductionEquality (sr_rw theta (pi ty_t), sr_rw theta2 (pi ty_t)));
     reject "extension by a type from another context" (Context (Extend (ty_t, delta)));
     reject "(Γ.t) π_{Γ.T} ≢ π_{Γ.T}" (SubstitutionEquality (s_comp (ext_tm t) (pi ty_t), pi ty_t));
   ]
@@ -450,15 +467,19 @@ let suites =
   ]
 
 let () =
-  let total = ref 0 and failed = ref 0 in
+  let total = ref 0 and failed = ref 0 and known = ref 0 in
   List.iter
     (fun (title, tests) ->
       Printf.printf "%s\n%!" title;
       List.iter
         (fun t ->
           incr total;
-          if not (run_test t) then incr failed)
+          match run_test t with
+          | Pass -> ()
+          | Fail -> incr failed
+          | Known -> incr known)
         tests)
     suites;
-  Printf.printf "\n%d/%d tests passed\n" (!total - !failed) !total;
+  Printf.printf "\n%d/%d tests passed, %d known incomplete, %d failed\n"
+    (!total - !failed - !known) !total !known !failed;
   if !failed > 0 then exit 1
