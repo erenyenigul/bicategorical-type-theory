@@ -10,7 +10,7 @@ exception CheckError of type_error
 
 let string_of_type_error error =
   let at = function
-    | Some loc -> " at " ^ loc
+    | Some loc -> " (" ^ String.uncapitalize_ascii loc ^ ")"
     | None -> ""
   in
   match error with

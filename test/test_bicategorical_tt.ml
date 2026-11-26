@@ -36,18 +36,32 @@ let tr_rw (r : term_reduction) (t : term) : term_reduction = RightWhisker (r, t)
 (* ------------------------------------------------------------------ *)
 (* Test harness *)
 
-(* [Incomplete]: the judgement holds, but lies outside the fragment the
-   checker is complete for (seams, rew-tm, non-boundary-connected
-   diagrams). Rejecting it is expected; accepting it is reported. *)
-type expectation = Accept | Reject | Incomplete
+type expectation = Accept | Reject
 
 type test = { name : string; judgement : judgement; expect : expectation }
 
 let accept name judgement = { name; judgement; expect = Accept }
 let reject name judgement = { name; judgement; expect = Reject }
-let incomplete name judgement = { name; judgement; expect = Incomplete }
 
-type result = Pass | Fail | Known
+type result = Pass | Fail
+
+(* ANSI colours; disabled when NO_COLOR is set (https://no-color.org). *)
+let use_color = Sys.getenv_opt "NO_COLOR" = None
+
+let style code s = if use_color then "\027[" ^ code ^ "m" ^ s ^ "\027[0m" else s
+let bold = style "1"
+let dim = style "2"
+let red = style "31"
+let green = style "32"
+let cyan = style "36"
+
+let tag_pass = green "[PASS]"
+let tag_fail = bold (red "[FAIL]")
+
+(* A labelled detail line printed under a test, e.g. "expected: accept". *)
+let detail label value = Printf.sprintf "%s %s" (dim (Printf.sprintf "%-9s" (label ^ ":"))) value
+
+let print_details lines = List.iter (fun l -> Printf.printf "         %s\n" l) lines
 
 let run_test (t : test) : result =
   let outcome =
@@ -56,22 +70,19 @@ let run_test (t : test) : result =
     | Failure err -> Error (Errors.string_of_type_error err)
     | exception e -> Error ("exception " ^ Printexc.to_string e)
   in
+  let fail details =
+    Printf.printf "  %s %s\n" tag_fail (bold t.name);
+    print_details details;
+    Printf.printf "%!";
+    Fail
+  in
   match t.expect, outcome with
   | Accept, Ok () | Reject, Error _ ->
-      Printf.printf "  [PASS] %s\n%!" t.name;
+      Printf.printf "  %s %s\n%!" tag_pass t.name;
       Pass
   | Accept, Error msg ->
-      Printf.printf "  [FAIL] %s: expected acceptance, got: %s\n%!" t.name msg;
-      Fail
-  | Reject, Ok () ->
-      Printf.printf "  [FAIL] %s: expected rejection, but it was accepted\n%!" t.name;
-      Fail
-  | Incomplete, Error msg ->
-      Printf.printf "  [INCOMPLETE] %s: %s\n%!" t.name msg;
-      Known
-  | Incomplete, Ok () ->
-      Printf.printf "  [PASS] %s (now accepted: change [incomplete] to [accept])\n%!" t.name;
-      Pass
+      fail [ detail "expected" (green "accept"); detail "got" (red "reject") ^ dim " — " ^ msg ]
+  | Reject, Ok () -> fail [ detail "expected" (green "reject"); detail "got" (red "accept") ]
 
 (* ------------------------------------------------------------------ *)
 (* Shared fixtures *)
@@ -467,19 +478,21 @@ let suites =
   ]
 
 let () =
-  let total = ref 0 and failed = ref 0 and known = ref 0 in
+  let total = ref 0 and failed = ref 0 in
   List.iter
     (fun (title, tests) ->
-      Printf.printf "%s\n%!" title;
+      Printf.printf "\n%s\n%!" (bold (cyan title));
       List.iter
         (fun t ->
           incr total;
           match run_test t with
           | Pass -> ()
-          | Fail -> incr failed
-          | Known -> incr known)
+          | Fail -> incr failed)
         tests)
     suites;
-  Printf.printf "\n%d/%d tests passed, %d known incomplete, %d failed\n"
-    (!total - !failed - !known) !total !known !failed;
-  if !failed > 0 then exit 1
+  let failed = !failed in
+  Printf.printf "\n%s %s, %s\n"
+    (bold (Printf.sprintf "%d/%d" (!total - failed) !total))
+    (green "passed")
+    ((if failed > 0 then red else dim) (Printf.sprintf "%d failed" failed));
+  if failed > 0 then exit 1
